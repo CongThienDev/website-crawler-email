@@ -24,22 +24,47 @@
       }
       * { box-sizing: border-box; }
       body { margin: 0; background: var(--canvas); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      [hidden] { display: none !important; }
       button, input { font: inherit; }
-      button { cursor: pointer; }
+      button { cursor: pointer; touch-action: manipulation; }
+      button:focus-visible, input:focus-visible, .dropzone:focus-within { outline: 3px solid rgba(37, 99, 235, .28); outline-offset: 2px; }
+      .auth-shell { min-height: 100dvh; display: grid; place-items: center; padding: 32px 20px; background: radial-gradient(circle at 15% 15%, #e8efff 0, transparent 35%), var(--canvas); }
+      .auth-card { width: min(100%, 430px); background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 24px 70px rgba(38, 52, 87, .13); padding: 34px; }
+      .auth-logo { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 15px; color: #fff; background: var(--blue); box-shadow: 0 10px 24px rgba(37, 99, 235, .24); margin-bottom: 25px; }
+      .auth-logo svg { width: 25px; height: 25px; }
+      .auth-card h1 { font-size: 32px; letter-spacing: -.045em; margin: 0 0 9px; }
+      .auth-card > p { color: var(--muted); line-height: 1.6; margin: 0 0 26px; }
+      .field { margin-top: 17px; }
+      .field label { margin-bottom: 7px; }
+      .text-input { width: 100%; min-height: 46px; border: 1px solid var(--line); background: #fbfcff; color: var(--ink); border-radius: 10px; padding: 11px 12px; outline: none; transition: border-color .18s ease, box-shadow .18s ease; }
+      .text-input:focus { border-color: #8aabf5; box-shadow: 0 0 0 3px var(--blue-soft); }
+      .password-wrap { position: relative; }
+      .password-wrap .text-input { padding-right: 70px; }
+      .password-toggle { position: absolute; right: 5px; top: 5px; min-height: 36px; border: 0; border-radius: 7px; background: transparent; color: var(--blue); font-size: 12px; font-weight: 800; padding: 0 9px; }
+      .password-toggle:hover { background: var(--blue-soft); }
+      .auth-error { min-height: 22px; margin: 12px 0 0; color: #ad302b; font-size: 13px; line-height: 1.5; }
+      .auth-submit { width: 100%; min-height: 46px; margin-top: 8px; }
+      .auth-foot { display: flex; gap: 8px; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; margin-top: 22px; }
+      .auth-foot svg { width: 15px; height: 15px; flex: 0 0 auto; }
       .topbar { height: 92px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 clamp(24px, 7vw, 132px); gap: 38px; }
       .brand { display: flex; align-items: center; gap: 14px; min-width: 275px; }
       .brand-mark { width: 42px; height: 42px; display: grid; place-items: center; color: white; background: var(--blue); border-radius: 13px; font-size: 25px; font-weight: 800; letter-spacing: -2px; box-shadow: 0 8px 18px rgba(37, 99, 235, .22); }
       .brand strong { display: block; font-size: 19px; letter-spacing: -.03em; }
       .brand span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
       nav { display: flex; align-self: stretch; gap: 32px; }
-      nav button { border: 0; background: transparent; color: #66728b; font-weight: 700; padding: 0 3px; border-bottom: 3px solid transparent; }
-      nav button.active { color: var(--blue); border-bottom-color: var(--blue); }
+      nav span { display: flex; align-items: center; color: #66728b; font-weight: 700; padding: 0 3px; border-bottom: 3px solid transparent; }
+      nav span.active { color: var(--blue); border-bottom-color: var(--blue); }
       .server-state { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
       .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+      .user-menu { display: flex; align-items: center; gap: 10px; padding-left: 17px; border-left: 1px solid var(--line); }
+      .user-name { color: #4a5872; font-size: 13px; font-weight: 800; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .user-menu .btn { padding: 9px 12px; font-size: 12px; }
       main { width: min(1240px, calc(100% - 48px)); margin: 0 auto; padding: 54px 0 80px; }
       .eyebrow { color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
       h1 { font-size: clamp(34px, 4vw, 52px); line-height: 1.02; letter-spacing: -.065em; margin: 10px 0 12px; }
       .lede { color: var(--muted); max-width: 600px; font-size: 16px; line-height: 1.6; margin: 0; }
+      .notice { border: 1px solid #c8d8fb; background: var(--blue-soft); color: #1b4da8; border-radius: 11px; padding: 12px 14px; margin: -16px 0 24px; font-size: 13px; line-height: 1.5; }
+      .notice.error { border-color: #ffc4c1; background: var(--red-soft); color: #a32f2a; }
       .hero-row { display: flex; justify-content: space-between; gap: 34px; align-items: end; margin-bottom: 36px; }
       .hero-actions { display: flex; gap: 10px; }
       .btn { border: 1px solid var(--line); border-radius: 11px; padding: 12px 17px; background: white; color: var(--ink); font-weight: 800; transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
@@ -105,21 +130,37 @@
       .terminal-line.error { color: #ffb9b4; }
       .log-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: var(--muted); font-size: 11px; }
       .subtle { color: var(--muted); font-size: 12px; }
-      @media (max-width: 900px) { .topbar { padding: 0 20px; gap: 15px; } .brand { min-width: unset; } .brand span, nav button:nth-child(1), nav button:nth-child(2) { display: none; } main { width: min(100% - 28px, 700px); padding-top: 32px; } .hero-row { display: block; } .hero-actions { margin-top: 20px; } .workspace { grid-template-columns: 1fr; } .job-grid { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .kpi:nth-child(2) { border-right: 0; } .kpi:nth-child(3), .kpi:nth-child(4), .kpi:nth-child(5) { border-top: 1px solid var(--line); } .kpi:nth-child(4) { border-right: 0; } }
-      @media (max-width: 520px) { .topbar { height: 75px; } nav { display: none; } .server-state { display: none; } .option-grid { grid-template-columns: repeat(2, 1fr); } .form-footer { align-items: stretch; flex-direction: column; } .form-footer .btn { width: 100%; } .panel-head { align-items: flex-start; flex-direction: column; } .job-actions { justify-content: start; } .job-actions .btn { flex: 1; } }
+      @media (max-width: 900px) { .topbar { padding: 0 20px; gap: 15px; } .brand { min-width: unset; } .brand span { display: none; } main { width: min(100% - 28px, 700px); padding-top: 32px; } .hero-row { display: block; } .hero-actions { margin-top: 20px; } .workspace { grid-template-columns: 1fr; } .job-grid { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .kpi:nth-child(2) { border-right: 0; } .kpi:nth-child(3), .kpi:nth-child(4), .kpi:nth-child(5) { border-top: 1px solid var(--line); } .kpi:nth-child(4) { border-right: 0; } }
+      @media (max-width: 520px) { .auth-card { padding: 27px 22px; } .topbar { height: 75px; } nav { display: none; } .server-state, .user-name { display: none; } .user-menu { margin-left: auto; border-left: 0; padding-left: 0; } .option-grid { grid-template-columns: repeat(2, 1fr); } .form-footer { align-items: stretch; flex-direction: column; } .form-footer .btn { width: 100%; } .panel-head { align-items: flex-start; flex-direction: column; } .job-actions { justify-content: start; } .job-actions .btn { flex: 1; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
     </style>
   </head>
   <body>
+    <section class="auth-shell" id="loginView" aria-labelledby="loginTitle" hidden>
+      <form class="auth-card" id="loginForm" novalidate>
+        <div class="auth-logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></div>
+        <h1 id="loginTitle">Welcome back</h1>
+        <p>Sign in to manage crawl jobs and download collected results.</p>
+        <div class="field"><label for="username">Username</label><input class="text-input" id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required /></div>
+        <div class="field"><label for="password">Password</label><div class="password-wrap"><input class="text-input" id="password" name="password" type="password" autocomplete="current-password" required aria-describedby="loginError" /><button class="password-toggle" id="passwordToggle" type="button" aria-controls="password" aria-pressed="false">Show</button></div></div>
+        <div class="auth-error" id="loginError" role="alert" aria-live="assertive"></div>
+        <button class="btn primary auth-submit" id="loginBtn" type="submit">Sign in</button>
+        <div class="auth-foot"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg><span>Protected with a private server session</span></div>
+      </form>
+    </section>
+    <div id="appShell" hidden>
     <header class="topbar">
       <div class="brand"><div class="brand-mark">W</div><div><strong>Web Prospect</strong><span>Public website email discovery</span></div></div>
-      <nav><button class="active">Jobs</button><button>Exports</button><button>System</button></nav>
+      <nav aria-label="Primary navigation"><span class="active" aria-current="page">Jobs</span></nav>
       <div class="server-state"><span class="dot"></span><span>Worker online</span></div>
+      <div class="user-menu"><span class="user-name" id="currentUser"></span><button class="btn" id="logoutBtn" type="button">Log out</button></div>
     </header>
     <main>
       <div class="hero-row">
         <div><div class="eyebrow">Operations / Email crawler</div><h1>Jobs</h1><p class="lede">Upload a sheet, monitor the crawl, and export verified public email results as the worker progresses.</p></div>
-        <div class="hero-actions"><button class="btn" id="refreshBtn">Refresh jobs</button></div>
+        <div class="hero-actions"><button class="btn" id="refreshBtn" type="button">Refresh jobs</button></div>
       </div>
+      <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
       <div class="workspace">
         <section class="panel">
           <div class="panel-head"><div><h2>New crawl</h2><p>Input sheet must contain a <strong>Website</strong> column in <strong>Data unique</strong>.</p></div></div>
@@ -150,28 +191,312 @@
         </section>
       </div>
     </main>
+    </div>
     <script>
-      const state = { files: [], job: null, source: null };
+      const state = { files: [], job: null, source: null, busy: false, streamCheckPending: false };
       const $ = (id) => document.getElementById(id);
-      const fileInput = $("fileInput"), dropzone = $("dropzone"), fileList = $("fileList");
-      function setFiles(files) { state.files = [...files].filter((file) => /\.xlsx$/i.test(file.name)); fileList.innerHTML = state.files.map((file) => `<span class="file-chip">${escapeHtml(file.name)} · ${formatBytes(file.size)}</span>`).join(""); $("startBtn").disabled = !state.files.length; }
-      function escapeHtml(value) { return value.replace(/[&<>\"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "'":"&#039;"}[char])); }
-      function formatBytes(bytes) { return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`; }
-      $("chooseBtn").onclick = () => fileInput.click(); fileInput.onchange = () => setFiles(fileInput.files);
-      ["dragenter", "dragover"].forEach((event) => dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.add("dragging"); }));
-      ["dragleave", "drop"].forEach((event) => dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.remove("dragging"); }));
-      dropzone.addEventListener("drop", (e) => setFiles(e.dataTransfer.files));
-      function value(id) { return $(id).value; }
-      $("startBtn").onclick = async () => { const form = new FormData(); state.files.forEach((file) => form.append("files", file)); ["limit", "concurrency", "browserConcurrency", "contactPages", "maxPages", "retries"].forEach((id) => form.append(id, value(id))); form.append("browserFallback", $("browserFallback").checked ? "true" : "false"); $("startBtn").disabled = true; try { const response = await fetch("/api/jobs", { method: "POST", body: form }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Could not start job"); selectJob(data.id); } catch (error) { alert(error.message); $("startBtn").disabled = false; } };
-      $("refreshBtn").onclick = async () => { const response = await fetch("/api/jobs"); const jobs = await response.json(); if (jobs[0]) selectJob(jobs[0].id); };
-      $("stopBtn").onclick = async () => { if (!state.job || !confirm("Stop this crawl? Checkpointed results remain available.")) return; await fetch(`/api/jobs/${state.job}/stop`, { method: "POST" }); };
-      $("downloadCsv").onclick = () => state.job && (window.location.href = `/api/jobs/${state.job}/download/csv`);
-      $("downloadXlsx").onclick = () => state.job && (window.location.href = `/api/jobs/${state.job}/download/xlsx`);
-      function selectJob(id) { state.job = id; $("jobPanel").hidden = false; if (state.source) state.source.close(); state.source = new EventSource(`/api/jobs/${id}/stream`); state.source.onmessage = (message) => { const payload = JSON.parse(message.data); if (payload.snapshot) render(payload.snapshot); if (payload.line) appendLog(payload.line); }; state.source.onerror = () => {}; window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); }
-      function appendLog(line) { const terminal = $("terminal"); if (terminal.children.length === 1 && terminal.firstElementChild.textContent === "Waiting for worker events…") terminal.innerHTML = ""; const row = document.createElement("div"); row.className = `terminal-line ${/ERROR|403|429|THROTTLE/.test(line) ? "error" : /DONE/.test(line) ? "done" : ""}`; row.textContent = line; terminal.appendChild(row); while (terminal.children.length > 220) terminal.removeChild(terminal.firstChild); terminal.scrollTop = terminal.scrollHeight; $("logCount").textContent = `${terminal.children.length} log lines`; }
-      function render(snapshot) { $("jobId").textContent = `JOB ${snapshot.id}`; $("jobStatus").textContent = snapshot.status.toUpperCase(); $("jobStatus").className = `status-pill ${snapshot.status}`; $("jobHeading").textContent = `${snapshot.done} of ${snapshot.total || "—"} websites`; $("jobSubheading").textContent = `${snapshot.options.concurrency} HTTP · ${snapshot.options.browserConcurrency} browser pages · ${snapshot.active} active`; $("progressText").textContent = `${snapshot.done} / ${snapshot.total || "—"}`; $("progressPct").textContent = `${snapshot.progress.toFixed(1)}%`; $("progressFill").style.width = `${snapshot.progress}%`; $("kpiEmails").textContent = snapshot.foundEmails; $("kpiSites").textContent = snapshot.foundWebsites; $("kpiNoEmail").textContent = snapshot.noEmail; $("kpiErrors").textContent = snapshot.errors; $("kpiRate").textContent = Number(snapshot.ratePerMinute || 0).toFixed(1); renderBreakdown("statusBreakdown", snapshot.statusCounts, { found_http: ["Found HTTP", "green"], found_browser: ["Found browser", "green"], no_email: ["No email", "orange"], http_error: ["HTTP error", "red"], browser_error: ["Browser error", "red"], robots_denied: ["Robots denied", "orange"] }); renderBreakdown("httpBreakdown", snapshot.httpStatusCounts, {}); $("stopBtn").disabled = !["queued", "running"].includes(snapshot.status); }
-      function renderBreakdown(id, counts, labels) { const root = $(id), total = Math.max(1, Object.values(counts || {}).reduce((a, b) => a + b, 0)); root.innerHTML = Object.entries(counts || {}).sort((a, b) => b[1] - a[1]).map(([key, count]) => { const definition = labels[key] || [key === "-" ? "No response" : `HTTP ${key}`, ""]; return `<div class="breakdown-row"><span>${definition[0]}</span><div class="mini-track"><div class="mini-fill ${definition[1]}" style="width:${(count / total * 100).toFixed(1)}%"></div></div><span>${count}</span></div>`; }).join("") || `<div class="empty">Waiting for first checkpoint…</div>`; }
-      fetch("/api/jobs").then((response) => response.json()).then((jobs) => { if (jobs[0]) selectJob(jobs[0].id); });
+      const fileInput = $("fileInput");
+      const dropzone = $("dropzone");
+      const fileList = $("fileList");
+
+      function errorMessage(error, fallback = "Something went wrong. Please try again.") {
+        return error instanceof Error && error.message ? error.message : fallback;
+      }
+
+      function setNotice(message = "", kind = "info") {
+        const notice = $("notice");
+        notice.textContent = message;
+        notice.className = `notice ${kind === "error" ? "error" : ""}`;
+        notice.hidden = !message;
+      }
+
+      function showLogin(message = "") {
+        state.source?.close();
+        state.source = null;
+        state.job = null;
+        $("appShell").hidden = true;
+        $("loginView").hidden = false;
+        $("loginError").textContent = message;
+        $("password").value = "";
+        window.setTimeout(() => $("username").focus(), 0);
+      }
+
+      function showApp(session) {
+        $("currentUser").textContent = session.username;
+        $("loginView").hidden = true;
+        $("appShell").hidden = false;
+        $("loginError").textContent = "";
+      }
+
+      async function readJson(response) {
+        const contentType = response.headers.get("content-type") || "";
+        return contentType.includes("application/json") ? response.json() : {};
+      }
+
+      async function apiFetch(url, options = {}) {
+        const response = await fetch(url, options);
+        if (response.status === 401) {
+          const payload = await readJson(response);
+          showLogin(payload.error || "Your session has expired. Please sign in again.");
+          throw new Error(payload.error || "Authentication required.");
+        }
+        return response;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
+      }
+
+      function formatBytes(bytes) {
+        return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+      }
+
+      function updateStartButton() {
+        $("startBtn").disabled = state.busy || state.files.length === 0;
+      }
+
+      function setFiles(files) {
+        const selected = [...files];
+        const valid = selected.filter((file) => /\.xlsx$/i.test(file.name) && file.size <= 200 * 1024 * 1024).slice(0, 4);
+        state.files = valid;
+        fileList.innerHTML = valid.map((file) => `<span class="file-chip">${escapeHtml(file.name)} · ${formatBytes(file.size)}</span>`).join("");
+        updateStartButton();
+        if (valid.length !== selected.length) setNotice("Only the first four valid XLSX files under 200 MB were selected.", "error");
+        else setNotice();
+      }
+
+      $("chooseBtn").onclick = () => fileInput.click();
+      fileInput.onchange = () => setFiles(fileInput.files || []);
+      ["dragenter", "dragover"].forEach((event) => dropzone.addEventListener(event, (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragging");
+      }));
+      ["dragleave", "drop"].forEach((event) => dropzone.addEventListener(event, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragging");
+      }));
+      dropzone.addEventListener("drop", (e) => setFiles(e.dataTransfer?.files || []));
+
+      $("passwordToggle").onclick = () => {
+        const password = $("password");
+        const showing = password.type === "text";
+        password.type = showing ? "password" : "text";
+        $("passwordToggle").textContent = showing ? "Show" : "Hide";
+        $("passwordToggle").setAttribute("aria-pressed", String(!showing));
+        password.focus();
+      };
+
+      $("loginForm").onsubmit = async (event) => {
+        event.preventDefault();
+        const username = $("username").value.trim();
+        const password = $("password").value;
+        if (!username || !password) {
+          $("loginError").textContent = "Enter both username and password.";
+          (!username ? $("username") : $("password")).focus();
+          return;
+        }
+        const button = $("loginBtn");
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        button.textContent = "Signing in…";
+        $("loginError").textContent = "";
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+          const payload = await readJson(response);
+          if (!response.ok) throw new Error(payload.error || "Sign-in failed.");
+          showApp(payload);
+          await refreshJobs(false);
+        } catch (error) {
+          $("loginError").textContent = errorMessage(error, "Could not sign in.");
+          $("password").select();
+        } finally {
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
+          button.textContent = "Sign in";
+        }
+      };
+
+      $("logoutBtn").onclick = async () => {
+        try {
+          await fetch("/api/auth/logout", { method: "POST" });
+        } finally {
+          showLogin("You have signed out.");
+        }
+      };
+
+      function value(id) {
+        return $(id).value;
+      }
+
+      $("startBtn").onclick = async () => {
+        const form = new FormData();
+        state.files.forEach((file) => form.append("files", file));
+        ["limit", "concurrency", "browserConcurrency", "contactPages", "maxPages", "retries"].forEach((id) => form.append(id, value(id)));
+        form.append("browserFallback", $("browserFallback").checked ? "true" : "false");
+        state.busy = true;
+        updateStartButton();
+        setNotice();
+        try {
+          const response = await apiFetch("/api/jobs", { method: "POST", body: form });
+          const data = await readJson(response);
+          if (!response.ok) throw new Error(data.error || "Could not start job.");
+          selectJob(data.id);
+          setNotice("Crawl started successfully.");
+        } catch (error) {
+          if (!$("appShell").hidden) setNotice(errorMessage(error, "Could not start job."), "error");
+        } finally {
+          state.busy = false;
+          updateStartButton();
+        }
+      };
+
+      async function refreshJobs(showFeedback = true) {
+        const button = $("refreshBtn");
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        try {
+          const response = await apiFetch("/api/jobs");
+          const jobs = await readJson(response);
+          if (!response.ok) throw new Error(jobs.error || "Could not refresh jobs.");
+          const latest = Array.isArray(jobs) ? jobs.at(-1) : null;
+          if (latest) selectJob(latest.id);
+          if (showFeedback) setNotice(latest ? "Latest job loaded." : "No crawl jobs yet.");
+        } catch (error) {
+          if (!$("appShell").hidden) setNotice(errorMessage(error, "Could not refresh jobs."), "error");
+        } finally {
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
+        }
+      }
+
+      $("refreshBtn").onclick = () => refreshJobs(true);
+      $("stopBtn").onclick = async () => {
+        if (!state.job || !confirm("Stop this crawl? Checkpointed results remain available.")) return;
+        try {
+          const response = await apiFetch(`/api/jobs/${state.job}/stop`, { method: "POST" });
+          const data = await readJson(response);
+          if (!response.ok) throw new Error(data.error || "Could not stop job.");
+          render(data);
+          setNotice("Stop signal sent. Checkpointed results remain available.");
+        } catch (error) {
+          if (!$("appShell").hidden) setNotice(errorMessage(error, "Could not stop job."), "error");
+        }
+      };
+
+      async function download(format) {
+        if (!state.job) return;
+        try {
+          const response = await apiFetch(`/api/jobs/${state.job}/download/${format}`);
+          if (!response.ok) {
+            const payload = await readJson(response);
+            throw new Error(payload.error || "Could not prepare download.");
+          }
+          const blobUrl = URL.createObjectURL(await response.blob());
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.download = `email-results-${state.job}.${format}`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+          if (!$("appShell").hidden) setNotice(errorMessage(error, "Could not download results."), "error");
+        }
+      }
+      $("downloadCsv").onclick = () => download("csv");
+      $("downloadXlsx").onclick = () => download("xlsx");
+
+      function selectJob(id) {
+        state.job = id;
+        $("jobPanel").hidden = false;
+        state.source?.close();
+        state.source = new EventSource(`/api/jobs/${id}/stream`);
+        state.source.onmessage = (message) => {
+          try {
+            const payload = JSON.parse(message.data);
+            if (payload.snapshot) render(payload.snapshot);
+            if (payload.line) appendLog(payload.line);
+          } catch {
+            setNotice("Received an invalid worker update.", "error");
+          }
+        };
+        state.source.onerror = async () => {
+          if (state.streamCheckPending) return;
+          state.streamCheckPending = true;
+          try {
+            const response = await fetch("/api/auth/session");
+            if (response.status === 401) showLogin("Your session has expired. Please sign in again.");
+          } finally {
+            state.streamCheckPending = false;
+          }
+        };
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }
+
+      function appendLog(line) {
+        const terminal = $("terminal");
+        if (terminal.children.length === 1 && terminal.firstElementChild?.textContent === "Waiting for worker events…") terminal.innerHTML = "";
+        const row = document.createElement("div");
+        row.className = `terminal-line ${/ERROR|403|429|THROTTLE/.test(line) ? "error" : /DONE/.test(line) ? "done" : ""}`;
+        row.textContent = line;
+        terminal.appendChild(row);
+        while (terminal.children.length > 220) terminal.removeChild(terminal.firstChild);
+        terminal.scrollTop = terminal.scrollHeight;
+        $("logCount").textContent = `${terminal.children.length} log lines`;
+      }
+
+      function render(snapshot) {
+        const progress = Number(snapshot.progress || 0);
+        $("jobId").textContent = `JOB ${snapshot.id}`;
+        $("jobStatus").textContent = String(snapshot.status).toUpperCase();
+        $("jobStatus").className = `status-pill ${snapshot.status}`;
+        $("jobHeading").textContent = `${snapshot.done} of ${snapshot.total || "—"} websites`;
+        $("jobSubheading").textContent = `${snapshot.options.concurrency} HTTP · ${snapshot.options.browserConcurrency} browser pages · ${snapshot.active} active`;
+        $("progressText").textContent = `${snapshot.done} / ${snapshot.total || "—"}`;
+        $("progressPct").textContent = `${progress.toFixed(1)}%`;
+        $("progressFill").style.width = `${Math.min(100, Math.max(0, progress))}%`;
+        $("kpiEmails").textContent = snapshot.foundEmails;
+        $("kpiSites").textContent = snapshot.foundWebsites;
+        $("kpiNoEmail").textContent = snapshot.noEmail;
+        $("kpiErrors").textContent = snapshot.errors;
+        $("kpiRate").textContent = Number(snapshot.ratePerMinute || 0).toFixed(1);
+        renderBreakdown("statusBreakdown", snapshot.statusCounts, { found_http: ["Found HTTP", "green"], found_browser: ["Found browser", "green"], no_email: ["No email", "orange"], http_error: ["HTTP error", "red"], browser_error: ["Browser error", "red"], robots_denied: ["Robots denied", "orange"] });
+        renderBreakdown("httpBreakdown", snapshot.httpStatusCounts, {});
+        $("stopBtn").disabled = !["queued", "running"].includes(snapshot.status);
+        const terminal = $("terminal");
+        const waitingForLogs = terminal.children.length === 1 && terminal.firstElementChild?.textContent === "Waiting for worker events…";
+        if (Array.isArray(snapshot.logs) && waitingForLogs) snapshot.logs.forEach(appendLog);
+      }
+
+      function renderBreakdown(id, counts, labels) {
+        const root = $(id);
+        const entries = Object.entries(counts || {}).sort((a, b) => Number(b[1]) - Number(a[1]));
+        const total = Math.max(1, entries.reduce((sum, [, count]) => sum + Number(count), 0));
+        root.innerHTML = entries.map(([key, count]) => {
+          const definition = labels[key] || [key === "-" ? "No response" : `HTTP ${key}`, ""];
+          return `<div class="breakdown-row"><span>${escapeHtml(definition[0])}</span><div class="mini-track"><div class="mini-fill ${definition[1]}" style="width:${(Number(count) / total * 100).toFixed(1)}%"></div></div><span>${Number(count)}</span></div>`;
+        }).join("") || `<div class="empty">Waiting for first checkpoint…</div>`;
+      }
+
+      async function initialize() {
+        try {
+          const response = await fetch("/api/auth/session");
+          const session = await readJson(response);
+          if (!response.ok) {
+            showLogin();
+            return;
+          }
+          showApp(session);
+          await refreshJobs(false);
+        } catch {
+          showLogin("Cannot reach the server. Check the connection and try again.");
+        }
+      }
+      initialize();
     </script>
   </body>
 </html>

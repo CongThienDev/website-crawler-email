@@ -2,8 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
-import express, { type Request, type Response } from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
+import {
+  AUTH_COOKIE_NAME,
+  credentialsMatch,
+  expiredSessionCookie,
+  loadAuthConfig,
+  LoginRateLimiter,
+  readCookie,
+  sessionCookie,
+  SessionStore,
+} from "./auth.js";
 import { buildOutputRecords, recordsToCsv, writeLiveXlsx } from "./output.js";
 import { loadLeadRows } from "./input.js";
 import type { CrawlResult } from "./types.js";
@@ -12,6 +22,9 @@ const rootDirectory = process.cwd();
 const runsDirectory = path.join(rootDirectory, "ui-runs");
 const publicDirectory = path.join(rootDirectory, "ui", "public");
 fs.mkdirSync(runsDirectory, { recursive: true });
+const authConfig = loadAuthConfig();
+const sessions = new SessionStore(authConfig.sessionTtlMs);
+const loginLimiter = new LoginRateLimiter();
 
 type JobStatus = "queued" | "running" | "completed" | "failed" | "stopped";
 
@@ -100,7 +113,7 @@ function getSnapshot(job: Job): Record<string, unknown> {
   const starts = events.filter((event) => event.event === "start");
   const lastMetric = [...events].reverse().find((event) => event.event === "metrics");
   const totalFromEvents = Number([...events].reverse().find((event) => event.total)?.total ?? 0);
-  const total = job.options.limit || totalFromEvents || results.length;
+  const total = totalFromEvents || job.options.limit || results.length;
   const emailResults = results.filter((result) => Boolean(result.primaryEmail));
   const foundEmailCount = results.reduce((sum, result) => sum + result.emails.length, 0);
   const statusCounts = countValues(results.map((result) => result.status));
@@ -209,8 +222,76 @@ async function buildLiveFiles(job: Job): Promise<{ rows: Awaited<ReturnType<type
 }
 
 const app = express();
-app.use(express.json());
+app.disable("x-powered-by");
+if (process.env.TRUST_PROXY === "true") app.set("trust proxy", 1);
+app.use((_request, response, next) => {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "no-referrer");
+  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  response.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'",
+  );
+  next();
+});
+app.use("/api", (_request, response, next) => {
+  response.setHeader("Cache-Control", "no-store");
+  next();
+});
+app.use(express.json({ limit: "16kb" }));
 app.use(express.static(publicDirectory));
+
+function sessionFromRequest(request: Request) {
+  return sessions.get(readCookie(request.headers.cookie, AUTH_COOKIE_NAME));
+}
+
+function requireAuthentication(request: Request, response: Response, next: NextFunction): void {
+  if (sessionFromRequest(request)) {
+    next();
+    return;
+  }
+  response.status(401).json({ error: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn." });
+}
+
+app.get("/api/auth/session", (request, response) => {
+  const session = sessionFromRequest(request);
+  if (!session) return response.status(401).json({ authenticated: false });
+  return response.json({ authenticated: true, username: session.username, expiresAt: session.expiresAt });
+});
+
+app.post("/api/auth/login", (request, response) => {
+  const clientKey = request.ip || request.socket.remoteAddress || "unknown";
+  const retryAfter = loginLimiter.retryAfterSeconds(clientKey);
+  if (retryAfter > 0) {
+    response.setHeader("Retry-After", String(retryAfter));
+    return response.status(429).json({ error: `Đăng nhập tạm khóa. Thử lại sau ${retryAfter} giây.` });
+  }
+
+  const username = typeof request.body?.username === "string" ? request.body.username.slice(0, 256) : "";
+  const password = typeof request.body?.password === "string" ? request.body.password.slice(0, 1024) : "";
+  if (!credentialsMatch(username, password, authConfig)) {
+    const attemptsRemaining = loginLimiter.recordFailure(clientKey);
+    return response.status(401).json({
+      error: attemptsRemaining > 0
+        ? `Sai username hoặc password. Còn ${attemptsRemaining} lần thử.`
+        : "Đăng nhập tạm khóa trong 15 phút do thử sai nhiều lần.",
+    });
+  }
+
+  loginLimiter.reset(clientKey);
+  const { token, session } = sessions.create(authConfig.username);
+  response.setHeader("Set-Cookie", sessionCookie(token, authConfig.sessionTtlMs, authConfig.secureCookie));
+  return response.json({ authenticated: true, username: session.username, expiresAt: session.expiresAt });
+});
+
+app.post("/api/auth/logout", (request, response) => {
+  sessions.revoke(readCookie(request.headers.cookie, AUTH_COOKIE_NAME));
+  response.setHeader("Set-Cookie", expiredSessionCookie(authConfig.secureCookie));
+  return response.status(204).end();
+});
+
+app.use("/api/jobs", requireAuthentication);
 
 app.get("/api/jobs", (_request, response) => {
   response.json([...jobs.values()].map(getSnapshot));
@@ -233,8 +314,8 @@ app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Res
     const outputDirectory = path.join(jobDirectory, "output");
     fs.mkdirSync(inputDirectory, { recursive: true });
     fs.mkdirSync(outputDirectory, { recursive: true });
-    const inputFiles = files.map((file) => {
-      const destination = path.join(inputDirectory, safeFileName(file.originalname));
+    const inputFiles = files.map((file, index) => {
+      const destination = path.join(inputDirectory, `${String(index + 1).padStart(2, "0")}-${safeFileName(file.originalname)}`);
       fs.writeFileSync(destination, file.buffer);
       return destination;
     });
@@ -321,6 +402,25 @@ app.get("/api/jobs/:id/download/:format", (request, response) => {
 });
 
 app.get(/.*/, (_request, response) => response.sendFile(path.join(publicDirectory, "index.html")));
+
+app.use((error: unknown, request: Request, response: Response, next: NextFunction) => {
+  if (response.headersSent) {
+    next(error);
+    return;
+  }
+  const isUploadError = error instanceof multer.MulterError;
+  const status = isUploadError ? (error.code === "LIMIT_FILE_SIZE" ? 413 : 400) : 500;
+  const message = isUploadError
+    ? error.code === "LIMIT_FILE_SIZE"
+      ? "Mỗi file XLSX phải nhỏ hơn 200 MB."
+      : "Không thể nhận file upload. Hãy kiểm tra số lượng và định dạng file."
+    : "Lỗi máy chủ. Hãy thử lại hoặc kiểm tra log server.";
+  if (request.path.startsWith("/api/")) {
+    response.status(status).json({ error: message });
+    return;
+  }
+  response.status(500).send("Internal server error");
+});
 
 const port = asInt(process.env.PORT, 8080, 1, 65535);
 const host = process.env.HOST || "0.0.0.0";

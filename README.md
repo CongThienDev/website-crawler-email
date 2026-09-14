@@ -34,10 +34,16 @@ UI vận hành nằm trong folder riêng này, không dùng chung UI của scrap
 cd /path/to/GG_Map_Scraper_Email_PhoneNumber/website-email-crawler-node
 npm install
 npx playwright install chromium
+UI_USERNAME=admin \
+UI_PASSWORD='your-strong-password' \
 HOST=0.0.0.0 PORT=8090 npm run ui
 ```
 
-Mở `http://SERVER_IP:8090`. Trên VPS nên chạy trong `tmux`/`screen` và chỉ expose qua VPN hoặc reverse proxy có HTTPS + authentication; UI hiện chưa có đăng nhập. `ui-runs/` chứa file upload, checkpoint và kết quả của từng job nên đã được thêm vào `.gitignore`.
+Mở `http://SERVER_IP:8090` rồi đăng nhập bằng `UI_USERNAME` và `UI_PASSWORD`. Mật khẩu phải có ít nhất 8 ký tự; server sẽ không khởi động nếu thiếu thông tin đăng nhập. Session mặc định tồn tại 12 giờ và được lưu trong memory, vì vậy restart server sẽ đăng xuất tất cả phiên.
+
+Trên VPS nên chạy sau reverse proxy HTTPS. Khi public qua HTTPS, thêm `UI_COOKIE_SECURE=true`; nếu reverse proxy chuyển tiếp IP client đáng tin cậy thì thêm `TRUST_PROXY=true`. Có thể đổi thời gian session bằng `UI_SESSION_HOURS`. Xem [`.env.example`](.env.example) để biết đủ biến cấu hình. Không commit file `.env` thật vào Git.
+
+Toàn bộ API job, SSE realtime và file tải xuống đều yêu cầu session hợp lệ. Đăng nhập sai 5 lần từ cùng một IP sẽ bị khóa 15 phút. `ui-runs/` chứa file upload, checkpoint và kết quả của từng job nên đã được thêm vào `.gitignore`.
 
 Nút tải trong lúc đang chạy xuất phần dữ liệu đã checkpoint đến thời điểm bấm; tải lại sau khi hoàn tất để nhận đủ kết quả. Danh sách job hiện được giữ trong memory của tiến trình UI, vì vậy sau khi restart server cần mở lại file kết quả trong `ui-runs/` (checkpoint vẫn còn trên đĩa).
 
