@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Prospect · Email crawler</title>
+    <style>
+      :root {
+        --ink: #17233d;
+        --muted: #6f7b93;
+        --line: #dfe5f0;
+        --surface: #ffffff;
+        --canvas: #f5f7fb;
+        --blue: #2563eb;
+        --blue-soft: #eaf1ff;
+        --green: #1c9b65;
+        --green-soft: #e9f8f0;
+        --orange: #c97818;
+        --orange-soft: #fff4df;
+        --red: #d44a45;
+        --red-soft: #fff0ef;
+        --navy: #101827;
+        --shadow: 0 16px 42px rgba(38, 52, 87, 0.08);
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--canvas); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      .topbar { height: 92px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 clamp(24px, 7vw, 132px); gap: 38px; }
+      .brand { display: flex; align-items: center; gap: 14px; min-width: 275px; }
+      .brand-mark { width: 42px; height: 42px; display: grid; place-items: center; color: white; background: var(--blue); border-radius: 13px; font-size: 25px; font-weight: 800; letter-spacing: -2px; box-shadow: 0 8px 18px rgba(37, 99, 235, .22); }
+      .brand strong { display: block; font-size: 19px; letter-spacing: -.03em; }
+      .brand span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+      nav { display: flex; align-self: stretch; gap: 32px; }
+      nav button { border: 0; background: transparent; color: #66728b; font-weight: 700; padding: 0 3px; border-bottom: 3px solid transparent; }
+      nav button.active { color: var(--blue); border-bottom-color: var(--blue); }
+      .server-state { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+      main { width: min(1240px, calc(100% - 48px)); margin: 0 auto; padding: 54px 0 80px; }
+      .eyebrow { color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { font-size: clamp(34px, 4vw, 52px); line-height: 1.02; letter-spacing: -.065em; margin: 10px 0 12px; }
+      .lede { color: var(--muted); max-width: 600px; font-size: 16px; line-height: 1.6; margin: 0; }
+      .hero-row { display: flex; justify-content: space-between; gap: 34px; align-items: end; margin-bottom: 36px; }
+      .hero-actions { display: flex; gap: 10px; }
+      .btn { border: 1px solid var(--line); border-radius: 11px; padding: 12px 17px; background: white; color: var(--ink); font-weight: 800; transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+      .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(35, 57, 105, .1); }
+      .btn.primary { background: var(--blue); color: white; border-color: var(--blue); }
+      .btn.danger { color: var(--red); border-color: #ffc4c1; background: var(--red-soft); }
+      .btn:disabled { cursor: not-allowed; opacity: .5; transform: none; box-shadow: none; }
+      .workspace { display: grid; grid-template-columns: 1.05fr .95fr; gap: 24px; align-items: start; }
+      .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 17px; box-shadow: var(--shadow); }
+      .panel-head { display: flex; justify-content: space-between; gap: 16px; padding: 22px 25px; border-bottom: 1px solid var(--line); align-items: center; }
+      .panel-head h2 { margin: 0; font-size: 17px; letter-spacing: -.03em; }
+      .panel-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+      .panel-body { padding: 24px 25px; }
+      .dropzone { border: 1.5px dashed #a9bce8; background: #f7faff; border-radius: 13px; padding: 30px 18px; text-align: center; transition: border-color .18s ease, background .18s ease; }
+      .dropzone.dragging { border-color: var(--blue); background: var(--blue-soft); }
+      .drop-icon { width: 44px; height: 44px; display: grid; place-items: center; margin: 0 auto 13px; border-radius: 50%; background: var(--blue-soft); color: var(--blue); font-size: 21px; }
+      .dropzone strong { display: block; font-size: 15px; }
+      .dropzone p { margin: 7px 0 16px; color: var(--muted); font-size: 13px; }
+      .file-input { display: none; }
+      .file-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+      .file-chip { background: #f0f3f8; border-radius: 8px; padding: 8px 10px; color: #40506c; font-size: 12px; font-weight: 700; }
+      .option-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-top: 22px; }
+      label { display: block; color: #65728b; font-size: 12px; font-weight: 800; }
+      input[type=number] { width: 100%; border: 1px solid var(--line); background: #fbfcff; color: var(--ink); border-radius: 9px; padding: 10px 11px; margin-top: 7px; outline: none; }
+      input[type=number]:focus { border-color: #8aabf5; box-shadow: 0 0 0 3px var(--blue-soft); }
+      .option-note { color: var(--muted); font-size: 11px; margin-top: 14px; line-height: 1.5; }
+      .form-footer { margin-top: 22px; display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+      .check { display: flex; align-items: center; gap: 8px; color: #55647e; font-size: 13px; font-weight: 700; }
+      .check input { accent-color: var(--blue); }
+      .empty { color: var(--muted); text-align: center; padding: 45px 20px; font-size: 14px; }
+      .job-panel { grid-column: 1 / -1; overflow: hidden; }
+      .job-title { display: flex; align-items: center; gap: 10px; }
+      .status-pill { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 7px 10px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; background: var(--blue-soft); color: var(--blue); }
+      .status-pill.completed { color: var(--green); background: var(--green-soft); }
+      .status-pill.failed, .status-pill.stopped { color: var(--red); background: var(--red-soft); }
+      .status-pill.queued { color: var(--orange); background: var(--orange-soft); }
+      .job-id { color: var(--muted); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .job-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: end; }
+      .job-actions .btn { padding: 9px 12px; font-size: 12px; }
+      .progress-wrap { padding: 22px 25px 0; }
+      .progress-meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; font-weight: 700; }
+      .progress-meta strong { color: var(--ink); font-size: 15px; }
+      .progress-track { height: 11px; background: #e8edf5; border-radius: 999px; overflow: hidden; margin-top: 11px; }
+      .progress-fill { height: 100%; background: linear-gradient(90deg, #3773ed, #5c93fb); border-radius: inherit; transition: width .45s ease; width: 0; }
+      .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; margin: 23px 25px 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+      .kpi { padding: 16px 15px; background: #fbfcff; border-right: 1px solid var(--line); }
+      .kpi:last-child { border-right: 0; }
+      .kpi strong { display: block; font-size: 23px; letter-spacing: -.04em; }
+      .kpi span { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+      .job-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 22px; padding: 22px 25px 25px; }
+      .section-label { color: #65728b; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .09em; margin-bottom: 12px; }
+      .breakdown { border-top: 1px solid var(--line); }
+      .breakdown-row { display: grid; grid-template-columns: 116px 1fr 46px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eef1f6; font-size: 12px; }
+      .breakdown-row span:last-child { text-align: right; color: var(--muted); font-weight: 800; }
+      .mini-track { height: 7px; border-radius: 99px; overflow: hidden; background: #edf0f5; }
+      .mini-fill { height: 100%; border-radius: inherit; background: var(--blue); transition: width .4s ease; }
+      .mini-fill.green { background: var(--green); }
+      .mini-fill.orange { background: #e9a33d; }
+      .mini-fill.red { background: var(--red); }
+      .terminal { background: var(--navy); border-radius: 12px; height: 274px; overflow: auto; padding: 15px 17px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+      .terminal-line { color: #cbd5e8; font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+      .terminal-line.done { color: #c7d8f7; }
+      .terminal-line.error { color: #ffb9b4; }
+      .log-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: var(--muted); font-size: 11px; }
+      .subtle { color: var(--muted); font-size: 12px; }
+      @media (max-width: 900px) { .topbar { padding: 0 20px; gap: 15px; } .brand { min-width: unset; } .brand span, nav button:nth-child(1), nav button:nth-child(2) { display: none; } main { width: min(100% - 28px, 700px); padding-top: 32px; } .hero-row { display: block; } .hero-actions { margin-top: 20px; } .workspace { grid-template-columns: 1fr; } .job-grid { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .kpi:nth-child(2) { border-right: 0; } .kpi:nth-child(3), .kpi:nth-child(4), .kpi:nth-child(5) { border-top: 1px solid var(--line); } .kpi:nth-child(4) { border-right: 0; } }
+      @media (max-width: 520px) { .topbar { height: 75px; } nav { display: none; } .server-state { display: none; } .option-grid { grid-template-columns: repeat(2, 1fr); } .form-footer { align-items: stretch; flex-direction: column; } .form-footer .btn { width: 100%; } .panel-head { align-items: flex-start; flex-direction: column; } .job-actions { justify-content: start; } .job-actions .btn { flex: 1; } }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">W</div><div><strong>Web Prospect</strong><span>Public website email discovery</span></div></div>
+      <nav><button class="active">Jobs</button><button>Exports</button><button>System</button></nav>
+      <div class="server-state"><span class="dot"></span><span>Worker online</span></div>
+    </header>
+    <main>
+      <div class="hero-row">
+        <div><div class="eyebrow">Operations / Email crawler</div><h1>Jobs</h1><p class="lede">Upload a sheet, monitor the crawl, and export verified public email results as the worker progresses.</p></div>
+        <div class="hero-actions"><button class="btn" id="refreshBtn">Refresh jobs</button></div>
+      </div>
+      <div class="workspace">
+        <section class="panel">
+          <div class="panel-head"><div><h2>New crawl</h2><p>Input sheet must contain a <strong>Website</strong> column in <strong>Data unique</strong>.</p></div></div>
+          <div class="panel-body">
+            <div class="dropzone" id="dropzone"><div class="drop-icon">↑</div><strong>Drop XLSX files here</strong><p>or choose one or more files from this machine</p><button class="btn primary" id="chooseBtn">Choose files</button><input class="file-input" id="fileInput" type="file" accept=".xlsx" multiple /></div>
+            <div class="file-list" id="fileList"></div>
+            <div class="option-grid">
+              <label>Website limit<input id="limit" type="number" min="0" value="500" /></label>
+              <label>HTTP concurrency<input id="concurrency" type="number" min="1" max="200" value="25" /></label>
+              <label>Browser pages<input id="browserConcurrency" type="number" min="1" max="8" value="4" /></label>
+              <label>Contact pages<input id="contactPages" type="number" min="1" max="10" value="1" /></label>
+              <label>Max pages / site<input id="maxPages" type="number" min="1" max="20" value="3" /></label>
+              <label>Retries<input id="retries" type="number" min="0" max="5" value="0" /></label>
+            </div>
+            <p class="option-note">HTTP runs first. Browser fallback is reserved for no-email, timeout, and JavaScript-shell pages. A lower retry count gives a cleaner speed benchmark.</p>
+            <div class="form-footer"><label class="check"><input id="browserFallback" type="checkbox" checked /> Enable Playwright fallback</label><button class="btn primary" id="startBtn" disabled>Start crawl</button></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><div><h2>Live guidance</h2><p>What the worker is measuring</p></div><span class="status-pill queued">SSE realtime</span></div>
+          <div class="panel-body"><div class="section-label">Recommended reading order</div><div class="breakdown"><div class="breakdown-row"><span>Progress</span><div class="subtle">Completed sites / selected sites</div><span>01</span></div><div class="breakdown-row"><span>Found emails</span><div class="subtle">Unique websites with a primary email</div><span>02</span></div><div class="breakdown-row"><span>Quality</span><div class="subtle">Source, score, domain mismatch review</div><span>03</span></div><div class="breakdown-row"><span>Rate</span><div class="subtle">Sites per minute, errors, throttling</div><span>04</span></div></div><p class="option-note">Downloads are generated from the latest checkpoint, so CSV/XLSX remain available before the run finishes.</p></div>
+        </section>
+        <section class="panel job-panel" id="jobPanel" hidden>
+          <div class="panel-head"><div><div class="job-title"><span class="status-pill" id="jobStatus">RUNNING</span><span class="job-id" id="jobId">JOB —</span></div><h2 id="jobHeading" style="margin-top:10px">Email discovery run</h2><p id="jobSubheading">Starting worker…</p></div><div class="job-actions"><button class="btn" id="downloadCsv">Download CSV</button><button class="btn" id="downloadXlsx">Download XLSX</button><button class="btn danger" id="stopBtn">Stop job</button></div></div>
+          <div class="progress-wrap"><div class="progress-meta"><span><strong id="progressText">0 / 0</strong> websites processed</span><span id="progressPct">0%</span></div><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div></div>
+          <div class="kpis"><div class="kpi"><strong id="kpiEmails">0</strong><span>emails found</span></div><div class="kpi"><strong id="kpiSites">0</strong><span>websites with email</span></div><div class="kpi"><strong id="kpiNoEmail">0</strong><span>no email</span></div><div class="kpi"><strong id="kpiErrors">0</strong><span>HTTP / browser errors</span></div><div class="kpi"><strong id="kpiRate">0</strong><span>sites / minute</span></div></div>
+          <div class="job-grid"><div><div class="section-label">Status breakdown</div><div id="statusBreakdown" class="breakdown"></div><div class="section-label" style="margin-top:23px">HTTP statuses</div><div id="httpBreakdown" class="breakdown"></div></div><div><div class="section-label">Live terminal</div><div class="terminal" id="terminal"><div class="terminal-line">Waiting for worker events…</div></div><div class="log-footer"><span id="logCount">0 log lines</span><span>crawl.log + events.ndjson on server</span></div></div></div>
+        </section>
+      </div>
+    </main>
+    <script>
+      const state = { files: [], job: null, source: null };
+      const $ = (id) => document.getElementById(id);
+      const fileInput = $("fileInput"), dropzone = $("dropzone"), fileList = $("fileList");
+      function setFiles(files) { state.files = [...files].filter((file) => /\.xlsx$/i.test(file.name)); fileList.innerHTML = state.files.map((file) => `<span class="file-chip">${escapeHtml(file.name)} · ${formatBytes(file.size)}</span>`).join(""); $("startBtn").disabled = !state.files.length; }
+      function escapeHtml(value) { return value.replace(/[&<>\"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "'":"&#039;"}[char])); }
+      function formatBytes(bytes) { return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`; }
+      $("chooseBtn").onclick = () => fileInput.click(); fileInput.onchange = () => setFiles(fileInput.files);
+      ["dragenter", "dragover"].forEach((event) => dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.add("dragging"); }));
+      ["dragleave", "drop"].forEach((event) => dropzone.addEventListener(event, (e) => { e.preventDefault(); dropzone.classList.remove("dragging"); }));
+      dropzone.addEventListener("drop", (e) => setFiles(e.dataTransfer.files));
+      function value(id) { return $(id).value; }
+      $("startBtn").onclick = async () => { const form = new FormData(); state.files.forEach((file) => form.append("files", file)); ["limit", "concurrency", "browserConcurrency", "contactPages", "maxPages", "retries"].forEach((id) => form.append(id, value(id))); form.append("browserFallback", $("browserFallback").checked ? "true" : "false"); $("startBtn").disabled = true; try { const response = await fetch("/api/jobs", { method: "POST", body: form }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Could not start job"); selectJob(data.id); } catch (error) { alert(error.message); $("startBtn").disabled = false; } };
+      $("refreshBtn").onclick = async () => { const response = await fetch("/api/jobs"); const jobs = await response.json(); if (jobs[0]) selectJob(jobs[0].id); };
+      $("stopBtn").onclick = async () => { if (!state.job || !confirm("Stop this crawl? Checkpointed results remain available.")) return; await fetch(`/api/jobs/${state.job}/stop`, { method: "POST" }); };
+      $("downloadCsv").onclick = () => state.job && (window.location.href = `/api/jobs/${state.job}/download/csv`);
+      $("downloadXlsx").onclick = () => state.job && (window.location.href = `/api/jobs/${state.job}/download/xlsx`);
+      function selectJob(id) { state.job = id; $("jobPanel").hidden = false; if (state.source) state.source.close(); state.source = new EventSource(`/api/jobs/${id}/stream`); state.source.onmessage = (message) => { const payload = JSON.parse(message.data); if (payload.snapshot) render(payload.snapshot); if (payload.line) appendLog(payload.line); }; state.source.onerror = () => {}; window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); }
+      function appendLog(line) { const terminal = $("terminal"); if (terminal.children.length === 1 && terminal.firstElementChild.textContent === "Waiting for worker events…") terminal.innerHTML = ""; const row = document.createElement("div"); row.className = `terminal-line ${/ERROR|403|429|THROTTLE/.test(line) ? "error" : /DONE/.test(line) ? "done" : ""}`; row.textContent = line; terminal.appendChild(row); while (terminal.children.length > 220) terminal.removeChild(terminal.firstChild); terminal.scrollTop = terminal.scrollHeight; $("logCount").textContent = `${terminal.children.length} log lines`; }
+      function render(snapshot) { $("jobId").textContent = `JOB ${snapshot.id}`; $("jobStatus").textContent = snapshot.status.toUpperCase(); $("jobStatus").className = `status-pill ${snapshot.status}`; $("jobHeading").textContent = `${snapshot.done} of ${snapshot.total || "—"} websites`; $("jobSubheading").textContent = `${snapshot.options.concurrency} HTTP · ${snapshot.options.browserConcurrency} browser pages · ${snapshot.active} active`; $("progressText").textContent = `${snapshot.done} / ${snapshot.total || "—"}`; $("progressPct").textContent = `${snapshot.progress.toFixed(1)}%`; $("progressFill").style.width = `${snapshot.progress}%`; $("kpiEmails").textContent = snapshot.foundEmails; $("kpiSites").textContent = snapshot.foundWebsites; $("kpiNoEmail").textContent = snapshot.noEmail; $("kpiErrors").textContent = snapshot.errors; $("kpiRate").textContent = Number(snapshot.ratePerMinute || 0).toFixed(1); renderBreakdown("statusBreakdown", snapshot.statusCounts, { found_http: ["Found HTTP", "green"], found_browser: ["Found browser", "green"], no_email: ["No email", "orange"], http_error: ["HTTP error", "red"], browser_error: ["Browser error", "red"], robots_denied: ["Robots denied", "orange"] }); renderBreakdown("httpBreakdown", snapshot.httpStatusCounts, {}); $("stopBtn").disabled = !["queued", "running"].includes(snapshot.status); }
+      function renderBreakdown(id, counts, labels) { const root = $(id), total = Math.max(1, Object.values(counts || {}).reduce((a, b) => a + b, 0)); root.innerHTML = Object.entries(counts || {}).sort((a, b) => b[1] - a[1]).map(([key, count]) => { const definition = labels[key] || [key === "-" ? "No response" : `HTTP ${key}`, ""]; return `<div class="breakdown-row"><span>${definition[0]}</span><div class="mini-track"><div class="mini-fill ${definition[1]}" style="width:${(count / total * 100).toFixed(1)}%"></div></div><span>${count}</span></div>`; }).join("") || `<div class="empty">Waiting for first checkpoint…</div>`; }
+      fetch("/api/jobs").then((response) => response.json()).then((jobs) => { if (jobs[0]) selectJob(jobs[0].id); });
+    </script>
+  </body>
+</html>
