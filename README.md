@@ -133,3 +133,14 @@ npm run build
 ```
 
 Chỉ thu thập địa chỉ liên hệ được công khai trên website. Hãy tuân thủ điều khoản website, quy định bảo vệ dữ liệu và quy định chống spam áp dụng cho mục đích sử dụng của bạn.
+
+
+
+
+
+
+
+
+brew install node@20
+echo 'export PATH="/opt/homebrew/opt/node@20/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
