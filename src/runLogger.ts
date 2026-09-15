@@ -4,6 +4,9 @@ import type { CrawlResult, CrawlTarget } from "./types.js";
 
 export type CrawlPhase = "HTTP" | "BROWSER";
 
+const MAX_CRAWL_LOG_BYTES = 50 * 1024 * 1024;
+const MAX_ROTATED_LOG_FILES = 5;
+
 function displayUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
@@ -29,6 +32,27 @@ function resultOutcome(result: CrawlResult): string {
   if (result.status === "no_email") return "NOT FOUND EMAIL";
   if (result.error) return `ERROR=${cleanError(result.error)}`;
   return "NOT FOUND EMAIL";
+}
+
+function appendRotating(filePath: string, content: string): void {
+  const bytes = Buffer.byteLength(content, "utf8");
+  let currentSize = 0;
+  try {
+    currentSize = fs.statSync(filePath).size;
+  } catch {
+    // The file is created by appendFileSync below.
+  }
+  if (currentSize + bytes > MAX_CRAWL_LOG_BYTES) {
+    for (let index = MAX_ROTATED_LOG_FILES; index >= 1; index -= 1) {
+      const source = index === 1 ? filePath : `${filePath}.${index - 1}`;
+      const destination = `${filePath}.${index}`;
+      if (fs.existsSync(source)) {
+        if (fs.existsSync(destination)) fs.rmSync(destination);
+        fs.renameSync(source, destination);
+      }
+    }
+  }
+  fs.appendFileSync(filePath, content, "utf8");
 }
 
 export function formatStartLine(target: CrawlTarget, phase: CrawlPhase, completed: number, total: number, active = 0): string {
@@ -71,7 +95,7 @@ export class RunLogger {
   write(level: "INFO" | "WARN" | "ERROR" | "DEBUG", message: string): void {
     const cleanMessage = cleanError(message);
     const line = `[${new Date().toISOString()}] [${level}] ${cleanMessage}`;
-    fs.appendFileSync(this.filePath, `${line}\n`, "utf8");
+    appendRotating(this.filePath, `${line}\n`);
     console.log(line);
   }
 

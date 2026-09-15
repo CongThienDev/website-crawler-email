@@ -109,11 +109,22 @@
       .progress-meta strong { color: var(--ink); font-size: 15px; }
       .progress-track { height: 11px; background: #e8edf5; border-radius: 999px; overflow: hidden; margin-top: 11px; }
       .progress-fill { height: 100%; background: linear-gradient(90deg, #3773ed, #5c93fb); border-radius: inherit; transition: width .45s ease; width: 0; }
-      .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; margin: 23px 25px 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+      .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; margin: 23px 25px 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
       .kpi { padding: 16px 15px; background: #fbfcff; border-right: 1px solid var(--line); }
       .kpi:last-child { border-right: 0; }
       .kpi strong { display: block; font-size: 23px; letter-spacing: -.04em; }
       .kpi span { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+      .insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; padding: 22px 25px 0; }
+      .insight-section { min-width: 0; }
+      .insight-note { color: var(--muted); font-size: 11px; line-height: 1.5; margin: -4px 0 12px; }
+      .metric-list { border-top: 1px solid var(--line); }
+      .metric-row { display: grid; grid-template-columns: minmax(145px, 1fr) auto; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eef1f6; }
+      .metric-label { color: #53617a; font-size: 12px; }
+      .metric-label small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+      .metric-value { color: var(--ink); font-size: 13px; font-weight: 900; text-align: right; white-space: nowrap; }
+      .metric-value.good { color: var(--green); }
+      .metric-value.warn { color: var(--orange); }
+      .metric-value.alert { color: var(--red); }
       .job-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 22px; padding: 22px 25px 25px; }
       .section-label { color: #65728b; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .09em; margin-bottom: 12px; }
       .breakdown { border-top: 1px solid var(--line); }
@@ -130,7 +141,7 @@
       .terminal-line.error { color: #ffb9b4; }
       .log-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: var(--muted); font-size: 11px; }
       .subtle { color: var(--muted); font-size: 12px; }
-      @media (max-width: 900px) { .topbar { padding: 0 20px; gap: 15px; } .brand { min-width: unset; } .brand span { display: none; } main { width: min(100% - 28px, 700px); padding-top: 32px; } .hero-row { display: block; } .hero-actions { margin-top: 20px; } .workspace { grid-template-columns: 1fr; } .job-grid { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .kpi:nth-child(2) { border-right: 0; } .kpi:nth-child(3), .kpi:nth-child(4), .kpi:nth-child(5) { border-top: 1px solid var(--line); } .kpi:nth-child(4) { border-right: 0; } }
+      @media (max-width: 900px) { .topbar { padding: 0 20px; gap: 15px; } .brand { min-width: unset; } .brand span { display: none; } main { width: min(100% - 28px, 700px); padding-top: 32px; } .hero-row { display: block; } .hero-actions { margin-top: 20px; } .workspace { grid-template-columns: 1fr; } .insight-grid, .job-grid { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .kpi:nth-child(even) { border-right: 0; } .kpi:nth-child(n + 3) { border-top: 1px solid var(--line); } }
       @media (max-width: 520px) { .auth-card { padding: 27px 22px; } .topbar { height: 75px; } nav { display: none; } .server-state, .user-name { display: none; } .user-menu { margin-left: auto; border-left: 0; padding-left: 0; } .option-grid { grid-template-columns: repeat(2, 1fr); } .form-footer { align-items: stretch; flex-direction: column; } .form-footer .btn { width: 100%; } .panel-head { align-items: flex-start; flex-direction: column; } .job-actions { justify-content: start; } .job-actions .btn { flex: 1; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
     </style>
@@ -186,14 +197,26 @@
         <section class="panel job-panel" id="jobPanel" hidden>
           <div class="panel-head"><div><div class="job-title"><span class="status-pill" id="jobStatus">RUNNING</span><span class="job-id" id="jobId">JOB —</span></div><h2 id="jobHeading" style="margin-top:10px">Email discovery run</h2><p id="jobSubheading">Starting worker…</p></div><div class="job-actions"><button class="btn" id="downloadCsv">Download CSV</button><button class="btn" id="downloadXlsx">Download XLSX</button><button class="btn danger" id="stopBtn">Stop job</button></div></div>
           <div class="progress-wrap"><div class="progress-meta"><span><strong id="progressText">0 / 0</strong> websites processed</span><span id="progressPct">0%</span></div><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div></div>
-          <div class="kpis"><div class="kpi"><strong id="kpiEmails">0</strong><span>emails found</span></div><div class="kpi"><strong id="kpiSites">0</strong><span>websites with email</span></div><div class="kpi"><strong id="kpiNoEmail">0</strong><span>no email</span></div><div class="kpi"><strong id="kpiErrors">0</strong><span>HTTP / browser errors</span></div><div class="kpi"><strong id="kpiRate">0</strong><span>sites / minute</span></div></div>
-          <div class="job-grid"><div><div class="section-label">Status breakdown</div><div id="statusBreakdown" class="breakdown"></div><div class="section-label" style="margin-top:23px">HTTP statuses</div><div id="httpBreakdown" class="breakdown"></div></div><div><div class="section-label">Live terminal</div><div class="terminal" id="terminal"><div class="terminal-line">Waiting for worker events…</div></div><div class="log-footer"><span id="logCount">0 log lines</span><span>crawl.log + events.ndjson on server</span></div></div></div>
+          <div class="kpis"><div class="kpi"><strong id="kpiEmails">0</strong><span>emails found</span></div><div class="kpi"><strong id="kpiSites">0</strong><span>websites with email</span></div><div class="kpi"><strong id="kpiHitRate">—</strong><span>email hit rate</span></div><div class="kpi"><strong id="kpiNoEmail">0</strong><span>no email</span></div><div class="kpi"><strong id="kpiErrors">0</strong><span>HTTP / browser errors</span></div><div class="kpi"><strong id="kpiRate">0</strong><span>sites / minute</span></div></div>
+          <div class="insight-grid">
+            <section class="insight-section" aria-labelledby="coverageTitle">
+              <div class="section-label" id="coverageTitle">Coverage</div>
+              <p class="insight-note">Input rows and unique normalized websites. Crawl progress counts unique websites.</p>
+              <div class="metric-list" id="coverageMetrics"></div>
+            </section>
+            <section class="insight-section" aria-labelledby="qualityTitle">
+              <div class="section-label" id="qualityTitle">Data quality</div>
+              <p class="insight-note">Review flags help prioritize cleanup. Domain mismatch can be a valid alias.</p>
+              <div class="metric-list" id="qualityMetrics"></div>
+            </section>
+          </div>
+          <div class="job-grid"><div><div class="section-label">Status breakdown</div><div id="statusBreakdown" class="breakdown"></div><div class="section-label" style="margin-top:23px">HTTP statuses</div><div id="httpBreakdown" class="breakdown"></div></div><div><div class="section-label">Live terminal</div><div class="terminal" id="terminal"><div class="terminal-line">Waiting for worker events…</div></div><div class="log-footer"><span id="logCount">0 log lines shown</span><span>Live view keeps the latest 220 · full logs on server</span></div></div></div>
         </section>
       </div>
     </main>
     </div>
     <script>
-      const state = { files: [], job: null, source: null, busy: false, streamCheckPending: false };
+      const state = { files: [], job: null, source: null, busy: false, streamCheckPending: false, qualitySignature: "" };
       const $ = (id) => document.getElementById(id);
       const fileInput = $("fileInput");
       const dropzone = $("dropzone");
@@ -413,13 +436,16 @@
       function selectJob(id) {
         state.job = id;
         $("jobPanel").hidden = false;
+        $("terminal").innerHTML = '<div class="terminal-line">Waiting for worker events…</div>';
+        $("logCount").textContent = "0 log lines shown";
+        state.qualitySignature = "";
         state.source?.close();
         state.source = new EventSource(`/api/jobs/${id}/stream`);
         state.source.onmessage = (message) => {
           try {
             const payload = JSON.parse(message.data);
             if (payload.snapshot) render(payload.snapshot);
-            if (payload.line) appendLog(payload.line);
+            if (Array.isArray(payload.lines)) appendLogs(payload.lines, payload.logCount);
           } catch {
             setNotice("Received an invalid worker update.", "error");
           }
@@ -437,16 +463,29 @@
         window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
       }
 
-      function appendLog(line) {
+      function appendLogs(lines, totalCount) {
         const terminal = $("terminal");
         if (terminal.children.length === 1 && terminal.firstElementChild?.textContent === "Waiting for worker events…") terminal.innerHTML = "";
-        const row = document.createElement("div");
-        row.className = `terminal-line ${/ERROR|403|429|THROTTLE/.test(line) ? "error" : /DONE/.test(line) ? "done" : ""}`;
-        row.textContent = line;
-        terminal.appendChild(row);
+        const fragment = document.createDocumentFragment();
+        lines.forEach((line) => {
+          const row = document.createElement("div");
+          row.className = `terminal-line ${/ERROR|403|429|THROTTLE/.test(line) ? "error" : /DONE/.test(line) ? "done" : ""}`;
+          row.textContent = line;
+          fragment.appendChild(row);
+        });
+        terminal.appendChild(fragment);
         while (terminal.children.length > 220) terminal.removeChild(terminal.firstChild);
         terminal.scrollTop = terminal.scrollHeight;
-        $("logCount").textContent = `${terminal.children.length} log lines`;
+        const count = Number(totalCount || terminal.children.length);
+        $("logCount").textContent = `${Math.min(terminal.children.length, 220)} shown · ${count.toLocaleString()} total`;
+      }
+
+      function formatNumber(value) {
+        return Number(value || 0).toLocaleString();
+      }
+
+      function renderMetrics(id, rows) {
+        $(id).innerHTML = rows.map(({ label, note, value, tone = "" }) => `<div class="metric-row"><div class="metric-label">${escapeHtml(label)}${note ? `<small>${escapeHtml(note)}</small>` : ""}</div><div class="metric-value ${tone}">${escapeHtml(value)}</div></div>`).join("");
       }
 
       function render(snapshot) {
@@ -464,12 +503,38 @@
         $("kpiNoEmail").textContent = snapshot.noEmail;
         $("kpiErrors").textContent = snapshot.errors;
         $("kpiRate").textContent = Number(snapshot.ratePerMinute || 0).toFixed(1);
+        $("kpiHitRate").textContent = snapshot.done ? `${(Number(snapshot.emailHitRate || 0) * 100).toFixed(1)}%` : "—";
+        const coverage = snapshot.coverage || {};
+        const quality = snapshot.quality || {};
+        renderMetrics("coverageMetrics", [
+          { label: "Total input rows", value: formatNumber(coverage.totalRows) },
+          { label: "Rows with website", value: formatNumber(coverage.rowsWithWebsite) },
+          { label: "Unique websites", value: formatNumber(coverage.uniqueWebsites) },
+          { label: "Processed websites", note: `${formatNumber(coverage.processedRows)} source rows`, value: `${formatNumber(coverage.processedWebsites)} / ${formatNumber(coverage.uniqueWebsites)}`, tone: "good" },
+          { label: "Rows not processed", value: formatNumber(coverage.notProcessedRows), tone: Number(coverage.notProcessedRows) ? "warn" : "good" },
+          { label: "No website", value: formatNumber(coverage.noWebsiteRows), tone: Number(coverage.noWebsiteRows) ? "warn" : "good" },
+          { label: "Invalid URL", value: formatNumber(coverage.invalidUrlRows), tone: Number(coverage.invalidUrlRows) ? "alert" : "good" },
+        ]);
+        const qualitySignature = JSON.stringify(quality);
+        if (qualitySignature !== state.qualitySignature) {
+          state.qualitySignature = qualitySignature;
+          renderMetrics("qualityMetrics", [
+            { label: "Valid primary email", value: `${formatNumber(quality.validPrimaryEmails)} / ${formatNumber(quality.foundRows)}`, tone: "good" },
+            { label: "Unique primary emails", value: formatNumber(quality.uniquePrimaryEmails) },
+            { label: "Duplicate email rows", value: formatNumber(quality.duplicatePrimaryEmails), tone: Number(quality.duplicatePrimaryEmails) ? "warn" : "good" },
+            { label: "Duplicate email rate", note: `${formatNumber(quality.duplicatePrimaryEmails)} duplicate rows`, value: `${(Number(quality.duplicatePrimaryEmailRate || 0) * 100).toFixed(1)}%`, tone: Number(quality.duplicatePrimaryEmailRate) ? "warn" : "good" },
+            { label: "Score 70+", value: formatNumber(quality.scoreAtLeast70), tone: "good" },
+            { label: "Score below 55", value: formatNumber(quality.scoreBelow55), tone: Number(quality.scoreBelow55) ? "warn" : "good" },
+            { label: "Domain mismatch", value: formatNumber(quality.domainMismatch), tone: Number(quality.domainMismatch) ? "warn" : "good" },
+            { label: "All Emails needs review", value: formatNumber(quality.suspiciousAllEmails), tone: Number(quality.suspiciousAllEmails) ? "alert" : "good" },
+          ]);
+        }
         renderBreakdown("statusBreakdown", snapshot.statusCounts, { found_http: ["Found HTTP", "green"], found_browser: ["Found browser", "green"], no_email: ["No email", "orange"], http_error: ["HTTP error", "red"], browser_error: ["Browser error", "red"], robots_denied: ["Robots denied", "orange"] });
         renderBreakdown("httpBreakdown", snapshot.httpStatusCounts, {});
         $("stopBtn").disabled = !["queued", "running"].includes(snapshot.status);
         const terminal = $("terminal");
         const waitingForLogs = terminal.children.length === 1 && terminal.firstElementChild?.textContent === "Waiting for worker events…";
-        if (Array.isArray(snapshot.logs) && waitingForLogs) snapshot.logs.forEach(appendLog);
+        if (Array.isArray(snapshot.logs) && waitingForLogs) appendLogs(snapshot.logs, snapshot.logCount);
       }
 
       function renderBreakdown(id, counts, labels) {

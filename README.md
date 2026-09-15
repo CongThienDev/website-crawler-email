@@ -9,7 +9,7 @@ Tool độc lập để đọc cột `Website` trong sheet `Data unique`, tìm e
 3. Dùng HTTP để đọc homepage và các trang liên hệ ưu tiên như `contact`, `about`, `team`, `impressum`.
 4. Nếu HTTP không thấy email, dùng Playwright render JavaScript rồi thử lại.
 5. Ghi từng website vào `checkpoint-results.jsonl`; chạy lại cùng `--output` sẽ tiếp tục phần chưa xong.
-6. Ghi log chi tiết từng website vào `crawl.log`, log máy đọc được vào `events.ndjson` và in đồng thời ra terminal.
+6. Ghi log chi tiết từng website vào `crawl.log`, log máy đọc được vào `events.ndjson` và in đồng thời ra terminal. Mỗi job UI có folder output riêng; `crawl.log` tự rotate khi vượt 50 MB và giữ tối đa 5 file cũ.
 7. Xuất toàn bộ dòng nguồn kèm email, source URL, phương pháp tìm, score/confidence, trạng thái và số liệu benchmark.
 
 Tool mặc định tôn trọng `robots.txt`, loại URL tracking/map/social profile phổ biến, giới hạn request trên cùng hostname và không nhận localhost/private IPv4 làm đầu vào.
@@ -28,7 +28,7 @@ Nếu chỉ benchmark HTTP thì không cần cài Chromium và thêm `--no-brows
 
 ## UI chạy trên máy/VPS
 
-UI vận hành nằm trong folder riêng này, không dùng chung UI của scraper Google Maps. UI nhận tối đa 4 file `.xlsx` có sheet `Data unique`, stream log theo từng website qua SSE, hiển thị progress/KPI/status/HTTP status và cho tải CSV/XLSX từ checkpoint ngay cả khi job còn chạy.
+UI vận hành nằm trong folder riêng này, không dùng chung UI của scraper Google Maps. UI nhận tối đa 4 file `.xlsx` có sheet `Data unique`, stream progress và log theo batch qua SSE, chỉ giữ 220 dòng mới nhất trên màn hình, cập nhật progress/KPI mỗi giây và quality metrics tối đa mỗi 5 giây, hiển thị email hit rate trên số website đã xử lý và cho tải CSV/XLSX từ checkpoint ngay cả khi job còn chạy.
 
 ```bash
 cd /path/to/GG_Map_Scraper_Email_PhoneNumber/website-email-crawler-node
@@ -107,7 +107,7 @@ Giữ nguyên `--output` khi chạy lại để resume. Không dùng chung một
 - `email-results-<timestamp>.xlsx`: dữ liệu nguồn và cột email.
 - `email-results-<timestamp>.csv`: cùng dữ liệu, thuận tiện import database.
 - `benchmark-summary-<timestamp>.json`: hit rate, tốc độ, request count và số browser page.
-- `events.ndjson`: từng event `start`, `done`, `metrics`, `throttle` để phân tích bằng `jq`, Python hoặc Grafana/Loki.
+- `events.ndjson`: từng event `start`, `done`, `metrics`, `throttle` để phân tích bằng `jq`, Python hoặc Grafana/Loki. File này được giữ đầy đủ trong folder của từng run.
 
 Các trạng thái chính: `found_http`, `found_browser`, `no_email`, `http_error`, `browser_error`, `robots_denied`, `no_website`, `invalid_url`.
 
@@ -122,7 +122,7 @@ Tool không còn chỉ in tiến độ mỗi 50 website. Mỗi URL có hai dòng
 
 Nếu không tìm thấy email, dòng kết quả là `NOT FOUND EMAIL`. `FALLBACK_REASON` chỉ xuất hiện khi URL thực sự đủ điều kiện chuyển sang browser. Nếu website trả 403/429, dòng đó ghi `ERROR_CLASS` và status tương ứng nhưng không fallback. Cứ mỗi 10 giây tool ghi thêm `METRICS` gồm tốc độ, active và phân bố trạng thái. Khi fallback browser cập nhật lại kết quả của một URL, progress không bị cộng lần hai.
 
-File `crawl.log` được append đồng bộ nên vẫn xem được các website đã xử lý nếu bạn dừng bằng `Ctrl+C`. Checkpoint vẫn được ghi từng kết quả vào `checkpoint-results.jsonl`.
+File `crawl.log` được append đồng bộ nên vẫn xem được các website đã xử lý nếu bạn dừng bằng `Ctrl+C`; khi vượt 50 MB, file được chuyển thành `crawl.log.1`, `.2`... và giữ tối đa 5 bản cũ. Checkpoint vẫn được ghi từng kết quả vào `checkpoint-results.jsonl`. Server UI đọc checkpoint/events theo phần mới append thay vì đọc lại toàn bộ file mỗi giây, và live terminal chỉ nhận log theo batch nên không làm phình DOM hoặc SSE queue theo từng dòng.
 
 ## Kiểm tra code
 

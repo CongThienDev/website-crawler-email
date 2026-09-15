@@ -25,6 +25,10 @@ fs.mkdirSync(runsDirectory, { recursive: true });
 const authConfig = loadAuthConfig();
 const sessions = new SessionStore(authConfig.sessionTtlMs);
 const loginLimiter = new LoginRateLimiter();
+const MAX_MEMORY_LOG_LINES = 300;
+const LOG_FLUSH_INTERVAL_MS = 250;
+const MAX_SSE_LOG_BATCH_LINES = 80;
+const QUALITY_REFRESH_INTERVAL_MS = 5000;
 
 type JobStatus = "queued" | "running" | "completed" | "failed" | "stopped";
 
@@ -38,6 +42,16 @@ interface JobOptions {
   browserFallback: boolean;
 }
 
+interface SourceStats {
+  totalRows: number;
+  rowsWithWebsite: number;
+  validWebsiteRows: number;
+  uniqueWebsites: number;
+  noWebsiteRows: number;
+  invalidUrlRows: number;
+  rowKeyCounts: Map<string, number>;
+}
+
 interface Job {
   id: string;
   createdAt: string;
@@ -48,8 +62,32 @@ interface Job {
   child?: ChildProcess;
   stopRequested?: boolean;
   logs: string[];
+  logCount: number;
+  pendingLogs: string[];
+  logFlushTimer?: NodeJS.Timeout;
   listeners: Set<Response>;
   lastSnapshot?: string;
+  results: Map<string, CrawlResult>;
+  resultFileOffset: number;
+  resultRemainder: string;
+  totalFromEvents: number;
+  activeFromEvents: number;
+  eventFileOffset: number;
+  eventRemainder: string;
+  lastMetric?: Record<string, unknown>;
+  statusCounts: Map<string, number>;
+  errorClassCounts: Map<string, number>;
+  httpStatusCounts: Map<string, number>;
+  emailSources: Map<string, number>;
+  foundWebsites: number;
+  foundEmails: number;
+  processedRows: number;
+  browserUsed: number;
+  sourceStats: SourceStats;
+  resultVersion: number;
+  qualityVersion: number;
+  qualityUpdatedAt: number;
+  qualitySnapshot?: Record<string, number>;
 }
 
 const jobs = new Map<string, Job>();
@@ -83,47 +121,207 @@ function readResults(job: Job): CrawlResult[] {
   return [...latest.values()];
 }
 
-function readEvents(job: Job): Record<string, unknown>[] {
-  const filePath = path.join(job.outputDirectory, "events.ndjson");
-  if (!fs.existsSync(filePath)) return [];
-  const events: Record<string, unknown>[] = [];
-  for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const event = JSON.parse(line) as Record<string, unknown>;
-      events.push(event);
-    } catch {
-      // Ignore a partial final line.
+function changeCount(counts: Map<string, number>, key: string, delta: number): void {
+  const next = (counts.get(key) ?? 0) + delta;
+  if (next > 0) counts.set(key, next);
+  else counts.delete(key);
+}
+
+function resultHttpStatus(result: CrawlResult): string {
+  return result.httpStatus === null ? "-" : String(result.httpStatus);
+}
+
+function removeResultStats(job: Job, result: CrawlResult): void {
+  changeCount(job.statusCounts, result.status, -1);
+  if (result.errorClass) changeCount(job.errorClassCounts, result.errorClass, -1);
+  changeCount(job.httpStatusCounts, resultHttpStatus(result), -1);
+  if (result.primaryEmail) {
+    job.foundWebsites -= 1;
+    changeCount(job.emailSources, result.emails[0]?.sourceType ?? "unknown", -1);
+  }
+  job.foundEmails -= result.emails.length;
+}
+
+function addResultStats(job: Job, result: CrawlResult): void {
+  changeCount(job.statusCounts, result.status, 1);
+  if (result.errorClass) changeCount(job.errorClassCounts, result.errorClass, 1);
+  changeCount(job.httpStatusCounts, resultHttpStatus(result), 1);
+  if (result.primaryEmail) {
+    job.foundWebsites += 1;
+    changeCount(job.emailSources, result.emails[0]?.sourceType ?? "unknown", 1);
+  }
+  job.foundEmails += result.emails.length;
+}
+
+function applyResult(job: Job, result: CrawlResult): void {
+  const previous = job.results.get(result.key);
+  if (previous) removeResultStats(job, previous);
+  if (!previous) job.processedRows += job.sourceStats.rowKeyCounts.get(result.key) ?? 0;
+  const previousUsedBrowser = Boolean(previous?.browserPages);
+  const nextUsesBrowser = Boolean(result.browserPages);
+  if (previousUsedBrowser !== nextUsesBrowser) job.browserUsed += nextUsesBrowser ? 1 : -1;
+  job.results.set(result.key, result);
+  addResultStats(job, result);
+  job.resultVersion += 1;
+}
+
+function hostOf(rawUrl: string): string {
+  try {
+    return (new URL(rawUrl).hostname || "").toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function domainsRelated(left: string, right: string): boolean {
+  return Boolean(left && right && (left === right || left.endsWith(`.${right}`) || right.endsWith(`.${left}`)));
+}
+
+function isSuspiciousEmailToken(email: string): boolean {
+  const [local = "", domain = ""] = email.toLowerCase().split("@");
+  return email.length > 64 || local.length > 40 || domain.length > 40 ||
+    /(?:about|services|privacy|contact|instagram|created|press|follow|additional|submit|thanks|projects|lecture|exhibition|for)$/.test(email.toLowerCase());
+}
+
+function getQualitySnapshot(job: Job): Record<string, number> {
+  const primaryEmails = [...job.results.values()]
+    .map((result) => result.primaryEmail.trim())
+    .filter(Boolean);
+  const uniquePrimaryEmails = new Set(primaryEmails.map((email) => email.toLowerCase()));
+  let validPrimaryEmails = 0;
+  let scoreAtLeast70 = 0;
+  let scoreBelow55 = 0;
+  let domainMismatch = 0;
+  let suspiciousAllEmails = 0;
+  for (const result of job.results.values()) {
+    const primaryEmail = result.primaryEmail.trim();
+    if (primaryEmail && /^[^\s@;]+@[^\s@;]+\.[^\s@;]+$/.test(primaryEmail)) validPrimaryEmails += 1;
+    const score = result.primaryEmailScore ?? result.emails[0]?.score;
+    if (primaryEmail && score !== undefined) {
+      if (score >= 70) scoreAtLeast70 += 1;
+      if (score < 55) scoreBelow55 += 1;
+    }
+    if (primaryEmail) {
+      const emailDomain = primaryEmail.split("@").at(-1)?.toLowerCase() ?? "";
+      if (!domainsRelated(emailDomain, hostOf(result.inputUrl))) domainMismatch += 1;
+    }
+    if (result.emails.some((hit) => isSuspiciousEmailToken(hit.email))) suspiciousAllEmails += 1;
+  }
+  return {
+    foundRows: primaryEmails.length,
+    validPrimaryEmails,
+    uniquePrimaryEmails: uniquePrimaryEmails.size,
+    duplicatePrimaryEmails: Math.max(0, primaryEmails.length - uniquePrimaryEmails.size),
+    duplicatePrimaryEmailRate: primaryEmails.length ? Math.max(0, primaryEmails.length - uniquePrimaryEmails.size) / primaryEmails.length : 0,
+    scoreAtLeast70,
+    scoreBelow55,
+    domainMismatch,
+    suspiciousAllEmails,
+  };
+}
+
+function getSourceSnapshot(job: Job): Record<string, number> {
+  return {
+    totalRows: job.sourceStats.totalRows,
+    rowsWithWebsite: job.sourceStats.rowsWithWebsite,
+    uniqueWebsites: job.sourceStats.uniqueWebsites,
+    processedWebsites: job.results.size,
+    processedRows: job.processedRows,
+    notProcessedRows: Math.max(0, job.sourceStats.validWebsiteRows - job.processedRows),
+    noWebsiteRows: job.sourceStats.noWebsiteRows,
+    invalidUrlRows: job.sourceStats.invalidUrlRows,
+  };
+}
+
+function refreshJobFiles(job: Job): void {
+  const resultPath = path.join(job.outputDirectory, "checkpoint-results.jsonl");
+  if (fs.existsSync(resultPath)) {
+    const size = fs.statSync(resultPath).size;
+    if (size < job.resultFileOffset) {
+      job.resultFileOffset = 0;
+      job.resultRemainder = "";
+      job.results.clear();
+      job.statusCounts.clear();
+      job.errorClassCounts.clear();
+      job.httpStatusCounts.clear();
+      job.emailSources.clear();
+      job.foundWebsites = 0;
+      job.foundEmails = 0;
+      job.processedRows = 0;
+      job.browserUsed = 0;
+    }
+    if (size > job.resultFileOffset) {
+      const handle = fs.openSync(resultPath, "r");
+      try {
+        const buffer = Buffer.alloc(size - job.resultFileOffset);
+        fs.readSync(handle, buffer, 0, buffer.length, job.resultFileOffset);
+        job.resultFileOffset = size;
+        const lines = `${job.resultRemainder}${buffer.toString("utf8")}`.split(/\r?\n/);
+        job.resultRemainder = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const result = JSON.parse(line) as CrawlResult;
+            if (result.key) applyResult(job, result);
+          } catch {
+            // Keep malformed/partial lines out of the live snapshot.
+          }
+        }
+      } finally {
+        fs.closeSync(handle);
+      }
     }
   }
-  return events;
+
+  const eventsPath = path.join(job.outputDirectory, "events.ndjson");
+  if (!fs.existsSync(eventsPath)) return;
+  const size = fs.statSync(eventsPath).size;
+  if (size < job.eventFileOffset) {
+    job.eventFileOffset = 0;
+    job.eventRemainder = "";
+    job.totalFromEvents = 0;
+    job.activeFromEvents = 0;
+    job.lastMetric = undefined;
+  }
+  if (size <= job.eventFileOffset) return;
+  const handle = fs.openSync(eventsPath, "r");
+  try {
+    const buffer = Buffer.alloc(size - job.eventFileOffset);
+    fs.readSync(handle, buffer, 0, buffer.length, job.eventFileOffset);
+    job.eventFileOffset = size;
+    const lines = `${job.eventRemainder}${buffer.toString("utf8")}`.split(/\r?\n/);
+    job.eventRemainder = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line) as Record<string, unknown>;
+        if (Number(event.total) > 0) job.totalFromEvents = Number(event.total);
+        if (Number.isFinite(Number(event.active))) job.activeFromEvents = Number(event.active);
+        if (event.event === "metrics") job.lastMetric = event;
+      } catch {
+        // Keep malformed/partial lines out of the live snapshot.
+      }
+    }
+  } finally {
+    fs.closeSync(handle);
+  }
 }
 
-function countValues(values: string[]): Record<string, number> {
-  return values.reduce<Record<string, number>>((counts, value) => {
-    counts[value] = (counts[value] ?? 0) + 1;
-    return counts;
-  }, {});
-}
-
-function getSnapshot(job: Job): Record<string, unknown> {
-  const results = readResults(job);
-  const events = readEvents(job);
-  const doneEvents = events.filter((event) => event.event === "done");
-  const starts = events.filter((event) => event.event === "start");
-  const lastMetric = [...events].reverse().find((event) => event.event === "metrics");
-  const totalFromEvents = Number([...events].reverse().find((event) => event.total)?.total ?? 0);
-  const total = totalFromEvents || job.options.limit || results.length;
-  const emailResults = results.filter((result) => Boolean(result.primaryEmail));
-  const foundEmailCount = results.reduce((sum, result) => sum + result.emails.length, 0);
-  const statusCounts = countValues(results.map((result) => result.status));
-  const errorClassCounts = countValues(results.map((result) => result.errorClass).filter(Boolean).map(String));
-  const httpStatusCounts = countValues(results.map((result) => result.httpStatus === null ? "-" : String(result.httpStatus)));
-  const emailSources = countValues(
-    emailResults.map((result) => result.emails[0]?.sourceType ?? "unknown"),
-  );
+function getSnapshot(job: Job, forceQuality = false): Record<string, unknown> {
+  refreshJobFiles(job);
+  const now = Date.now();
+  if (
+    forceQuality ||
+    !job.qualitySnapshot ||
+    job.qualityVersion !== job.resultVersion && now - job.qualityUpdatedAt >= QUALITY_REFRESH_INTERVAL_MS
+  ) {
+    job.qualitySnapshot = getQualitySnapshot(job);
+    job.qualityVersion = job.resultVersion;
+    job.qualityUpdatedAt = now;
+  }
+  const total = job.totalFromEvents || job.options.limit || job.results.size;
   const elapsedMs = Math.max(1, Date.now() - new Date(job.createdAt).getTime());
-  const done = results.length;
+  const done = job.results.size;
   const calculatedRate = (done * 60000) / elapsedMs;
   return {
     id: job.id,
@@ -131,21 +329,25 @@ function getSnapshot(job: Job): Record<string, unknown> {
     createdAt: job.createdAt,
     total,
     done,
-    active: Math.max(0, starts.length - doneEvents.length),
+    active: Math.max(0, job.activeFromEvents),
     progress: total ? Math.min(100, (done / total) * 100) : 0,
-    foundWebsites: emailResults.length,
-    foundEmails: foundEmailCount,
-    noEmail: statusCounts.no_email ?? 0,
-    errors: (statusCounts.http_error ?? 0) + (statusCounts.browser_error ?? 0),
-    browserFound: statusCounts.found_browser ?? 0,
-    browserUsed: results.filter((result) => result.browserPages > 0).length,
-    ratePerMinute: Number(lastMetric?.ratePerMinute ?? calculatedRate),
-    statusCounts,
-    errorClassCounts,
-    httpStatusCounts,
-    emailSources,
+    foundWebsites: job.foundWebsites,
+    foundEmails: job.foundEmails,
+    noEmail: job.statusCounts.get("no_email") ?? 0,
+    errors: (job.statusCounts.get("http_error") ?? 0) + (job.statusCounts.get("browser_error") ?? 0),
+    browserFound: job.statusCounts.get("found_browser") ?? 0,
+    browserUsed: job.browserUsed,
+    emailHitRate: done ? job.foundWebsites / done : 0,
+    ratePerMinute: Number(job.lastMetric?.ratePerMinute ?? calculatedRate),
+    statusCounts: Object.fromEntries(job.statusCounts),
+    errorClassCounts: Object.fromEntries(job.errorClassCounts),
+    httpStatusCounts: Object.fromEntries(job.httpStatusCounts),
+    emailSources: Object.fromEntries(job.emailSources),
     options: job.options,
     logs: job.logs.slice(-220),
+    logCount: job.logCount,
+    coverage: getSourceSnapshot(job),
+    quality: job.qualitySnapshot,
     downloads: {
       csv: done > 0,
       xlsx: done > 0,
@@ -168,8 +370,24 @@ function appendLog(job: Job, line: string): void {
   const clean = line.replace(/\u001b\[[0-?]*[ -\/]*[@-~]/g, "").trim();
   if (!clean) return;
   job.logs.push(clean);
-  if (job.logs.length > 300) job.logs.splice(0, job.logs.length - 300);
-  broadcast(job, { type: "log", line: clean });
+  job.logCount += 1;
+  if (job.logs.length > MAX_MEMORY_LOG_LINES) job.logs.splice(0, job.logs.length - MAX_MEMORY_LOG_LINES);
+  job.pendingLogs.push(clean);
+  if (job.pendingLogs.length > MAX_MEMORY_LOG_LINES) {
+    job.pendingLogs.splice(0, job.pendingLogs.length - MAX_MEMORY_LOG_LINES);
+  }
+  if (!job.logFlushTimer) {
+    job.logFlushTimer = setTimeout(() => flushLogs(job), LOG_FLUSH_INTERVAL_MS);
+    job.logFlushTimer.unref?.();
+  }
+}
+
+function flushLogs(job: Job): void {
+  job.logFlushTimer = undefined;
+  if (!job.pendingLogs.length) return;
+  const lines = job.pendingLogs.splice(-MAX_SSE_LOG_BATCH_LINES);
+  job.pendingLogs.length = 0;
+  if (job.listeners.size) broadcast(job, { type: "logs", lines, logCount: job.logCount });
 }
 
 function startJob(job: Job): void {
@@ -209,8 +427,10 @@ function startJob(job: Job): void {
   attachLogStream(child.stdout);
   attachLogStream(child.stderr);
   child.on("close", (code, signal) => {
+    if (job.logFlushTimer) clearTimeout(job.logFlushTimer);
+    flushLogs(job);
     job.status = job.stopRequested || signal === "SIGINT" ? "stopped" : code === 0 ? "completed" : "failed";
-    broadcast(job, { type: "status", status: job.status, snapshot: getSnapshot(job) });
+    broadcast(job, { type: "status", status: job.status, snapshot: getSnapshot(job, true) });
   });
   broadcast(job, { type: "status", status: "running", snapshot: getSnapshot(job) });
 }
@@ -294,7 +514,7 @@ app.post("/api/auth/logout", (request, response) => {
 app.use("/api/jobs", requireAuthentication);
 
 app.get("/api/jobs", (_request, response) => {
-  response.json([...jobs.values()].map(getSnapshot));
+  response.json([...jobs.values()].map((job) => getSnapshot(job)));
 });
 
 app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Response) => {
@@ -319,6 +539,20 @@ app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Res
       fs.writeFileSync(destination, file.buffer);
       return destination;
     });
+    const sourceRows = (await Promise.all(inputFiles.map((file) => loadLeadRows(file, "Data unique")))).flat();
+    const rowKeyCounts = new Map<string, number>();
+    for (const row of sourceRows) {
+      if (row.crawlKey) rowKeyCounts.set(row.crawlKey, (rowKeyCounts.get(row.crawlKey) ?? 0) + 1);
+    }
+    const sourceStats: SourceStats = {
+      totalRows: sourceRows.length,
+      rowsWithWebsite: sourceRows.filter((row) => Boolean(row.websiteRaw)).length,
+      validWebsiteRows: sourceRows.filter((row) => Boolean(row.crawlKey)).length,
+      uniqueWebsites: rowKeyCounts.size,
+      noWebsiteRows: sourceRows.filter((row) => row.preflightStatus === "no_website").length,
+      invalidUrlRows: sourceRows.filter((row) => row.preflightStatus === "invalid_url").length,
+      rowKeyCounts,
+    };
     const job: Job = {
       id,
       createdAt: new Date().toISOString(),
@@ -335,7 +569,28 @@ app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Res
       inputFiles,
       outputDirectory,
       logs: [],
+      logCount: 0,
+      pendingLogs: [],
       listeners: new Set(),
+      results: new Map(),
+      resultFileOffset: 0,
+      resultRemainder: "",
+      totalFromEvents: 0,
+      activeFromEvents: 0,
+      eventFileOffset: 0,
+      eventRemainder: "",
+      statusCounts: new Map(),
+      errorClassCounts: new Map(),
+      httpStatusCounts: new Map(),
+      emailSources: new Map(),
+      foundWebsites: 0,
+      foundEmails: 0,
+      processedRows: 0,
+      browserUsed: 0,
+      sourceStats,
+      resultVersion: 0,
+      qualityVersion: -1,
+      qualityUpdatedAt: 0,
     };
     jobs.set(id, job);
     startJob(job);
