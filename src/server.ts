@@ -561,7 +561,7 @@ app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Res
         limit: asInt(request.body.limit, 0, 0, 1000000),
         concurrency: asInt(request.body.concurrency, 25, 1, 200),
         browserConcurrency: asInt(request.body.browserConcurrency, 4, 1, 8),
-        contactPages: asInt(request.body.contactPages, 1, 1, 10),
+        contactPages: asInt(request.body.contactPages, 3, 1, 10),
         maxPages: asInt(request.body.maxPages, 3, 1, 20),
         retries: asInt(request.body.retries, 0, 0, 5),
         browserFallback: request.body.browserFallback !== "false",

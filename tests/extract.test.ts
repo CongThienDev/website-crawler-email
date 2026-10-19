@@ -36,6 +36,7 @@ describe("extractEmails text boundaries", () => {
     const emails = extractEmails(html, "https://acme.com/").map((hit) => hit.email);
     expect(emails).toEqual(["admin@acme.com", "brian@acme.com"]);
     expect(isValidEmail("contact@hello.com")).toBe(false);
+    expect(isValidEmail("contact@info.com")).toBe(false);
   });
 });
 

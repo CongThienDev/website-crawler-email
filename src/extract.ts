@@ -14,7 +14,7 @@ const BAD_LOCAL_PARTS = new Set([
 const BAD_DOMAINS = [
   "example.com", "example.org", "example.net", "domain.com", "email.com", "mysite.com", "yoursite.com",
   "yourdomain.com", "website.com", "company.com", "sentry.io", "wixpress.com", "wix.com", "squarespace.com",
-  "godaddy.com", "weebly.com", "editmysite.com", "duda.co", "hello.com",
+  "godaddy.com", "weebly.com", "editmysite.com", "duda.co", "hello.com", "info.com",
 ];
 const isBadDomain = (domain: string): boolean => BAD_DOMAINS.some((bad) => domain === bad || domain.endsWith(`.${bad}`));
 const ASSET_SUFFIXES = [
