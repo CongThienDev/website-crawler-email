@@ -436,7 +436,7 @@ function startJob(job: Job): void {
 }
 
 async function buildLiveFiles(job: Job): Promise<{ rows: Awaited<ReturnType<typeof loadLeadRows>>; results: Map<string, CrawlResult> }> {
-  const rows = (await Promise.all(job.inputFiles.map((file) => loadLeadRows(file, "Data unique")))).flat();
+  const rows = (await Promise.all(job.inputFiles.map((file) => loadLeadRows(file)))).flat();
   const results = new Map(readResults(job).map((result) => [result.key, result]));
   return { rows, results };
 }
@@ -525,7 +525,7 @@ app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Res
       return;
     }
     if (files.some((file) => !/\.xlsx$/i.test(file.originalname))) {
-      response.status(400).json({ error: "UI hiện nhận file .xlsx để giữ nguyên sheet Data unique." });
+      response.status(400).json({ error: "UI chỉ nhận file .xlsx do lead-ledger xuất (sheet Leads)." });
       return;
     }
     const id = randomUUID().slice(0, 8);
@@ -539,7 +539,7 @@ app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Res
       fs.writeFileSync(destination, file.buffer);
       return destination;
     });
-    const sourceRows = (await Promise.all(inputFiles.map((file) => loadLeadRows(file, "Data unique")))).flat();
+    const sourceRows = (await Promise.all(inputFiles.map((file) => loadLeadRows(file)))).flat();
     const rowKeyCounts = new Map<string, number>();
     for (const row of sourceRows) {
       if (row.crawlKey) rowKeyCounts.set(row.crawlKey, (rowKeyCounts.get(row.crawlKey) ?? 0) + 1);
@@ -558,7 +558,7 @@ app.post("/api/jobs", upload.array("files", 4), (request: Request, response: Res
       createdAt: new Date().toISOString(),
       status: "queued",
       options: {
-        limit: asInt(request.body.limit, 500, 0, 1000000),
+        limit: asInt(request.body.limit, 0, 0, 1000000),
         concurrency: asInt(request.body.concurrency, 25, 1, 200),
         browserConcurrency: asInt(request.body.browserConcurrency, 4, 1, 8),
         contactPages: asInt(request.body.contactPages, 1, 1, 10),

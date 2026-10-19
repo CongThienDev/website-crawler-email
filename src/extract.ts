@@ -6,8 +6,17 @@ import { sameSite } from "./url.js";
 // The full grammar permits `/` in a local part, which makes CDN versions and URL
 // paths such as `slick-carousel@1.8.1` look like email addresses.
 const EMAIL_RE = /[a-z0-9.!#$%&'*+=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?)+/gi;
-const BAD_LOCAL_PARTS = new Set(["example", "email", "name", "yourname", "user", "username", "test"]);
-const BAD_DOMAINS = new Set(["example.com", "example.org", "example.net", "domain.com", "email.com", "sentry.io"]);
+const BAD_LOCAL_PARTS = new Set([
+  "example", "email", "name", "yourname", "user", "username", "test",
+  "youremail", "your.email", "johndoe", "john.doe", "janedoe", "jane.doe", "firstname", "first.last", "firstname.lastname",
+]);
+// Placeholder and platform addresses (site builders, error trackers): never a contact email. Subdomains match too.
+const BAD_DOMAINS = [
+  "example.com", "example.org", "example.net", "domain.com", "email.com", "mysite.com", "yoursite.com",
+  "yourdomain.com", "website.com", "company.com", "sentry.io", "wixpress.com", "wix.com", "squarespace.com",
+  "godaddy.com", "weebly.com", "editmysite.com", "duda.co", "hello.com",
+];
+const isBadDomain = (domain: string): boolean => BAD_DOMAINS.some((bad) => domain === bad || domain.endsWith(`.${bad}`));
 const ASSET_SUFFIXES = [
   ".png",
   ".jpg",
@@ -22,20 +31,27 @@ const ASSET_SUFFIXES = [
   ".ttf",
 ];
 
+// Matched as substrings of the link path + text, best first. US local-service sites (the main market) often put
+// the address on quote/estimate forms or "reach us" pages; foreign terms stay last.
 const CONTACT_TERMS = [
   "contact",
-  "contact-us",
   "get-in-touch",
+  "get in touch",
+  "reach",
+  "email",
+  "quote",
+  "estimate",
   "about",
-  "about-us",
   "team",
   "staff",
   "people",
+  "locations",
+  "connect",
+  "support",
   "impressum",
   "kontakt",
   "contato",
   "contacto",
-  "support",
   "legal",
   "nous-contacter",
 ];
@@ -56,7 +72,7 @@ export function isValidEmail(candidate: string): boolean {
   const [local, domain, ...extra] = email.split("@");
   if (!local || !domain || extra.length || local.length > 64) return false;
   if (/[\\/:]/.test(local) || local.startsWith(".") || local.endsWith(".")) return false;
-  if (BAD_LOCAL_PARTS.has(local) || BAD_DOMAINS.has(domain)) return false;
+  if (BAD_LOCAL_PARTS.has(local) || isBadDomain(domain)) return false;
   if (ASSET_SUFFIXES.some((suffix) => email.endsWith(suffix))) return false;
   if (/^(no-?reply|donotreply|privacyplease)@/i.test(email)) return false;
   if (/\.(local|invalid|test)$/i.test(domain)) return false;
@@ -123,12 +139,17 @@ export function extractEmails(html: string, pageUrl: string): EmailHit[] {
   $("script:not([type='application/ld+json']), style, noscript").remove();
   addHits(hits, regexEmails($.html()), pageUrl, "text");
 
+  // text() joins sibling elements with no gap, gluing "a@b.com</a><span>Price" into "a@b.comPrice".
+  $("body *").after(" ");
   const visibleText = $.root().text();
+  // Bare " at " only counts when a bare " dot " follows ("info at acme dot com"); otherwise prose like
+  // "located at hamburg.de" would become located@hamburg.de.
   const deobfuscated = visibleText
     .replace(/\s*(?:\[\s*at\s*\]|\(\s*at\s*\))\s*/gi, "@")
-    .replace(/\s+at\s+/gi, "@")
     .replace(/\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\))\s*/gi, ".")
-    .replace(/\s+dot\s+/gi, ".");
+    .replace(/\b([a-z0-9._%+-]+)\s+at\s+([a-z0-9-]+(?:\s+dot\s+[a-z0-9-]+)+)\b/gi, (_m, local: string, host: string) =>
+      `${local}@${host.replace(/\s+dot\s+/gi, ".")}`,
+    );
   addHits(hits, regexEmails(deobfuscated), pageUrl, "obfuscated");
 
   return [...hits.values()].sort((a, b) => b.score - a.score || a.email.localeCompare(b.email));
@@ -166,6 +187,15 @@ export function findContactLinks(html: string, pageUrl: string): LinkCandidate[]
   return [...found.entries()]
     .map(([url, score]) => ({ url, score }))
     .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url));
+}
+
+// Early stop: a gmail or agency address alone is worth keeping, but more contact pages may hold the site's own.
+export function hasOwnDomainEmail(hits: EmailHit[], siteUrl: string): boolean {
+  const site = new URL(siteUrl).hostname.toLowerCase().replace(/^www\./, "");
+  return hits.some(({ email }) => {
+    const domain = email.split("@")[1] ?? "";
+    return domain === site || site.endsWith(`.${domain}`) || domain.endsWith(`.${site}`);
+  });
 }
 
 export function mergeEmailHits(...groups: EmailHit[][]): EmailHit[] {

@@ -8,7 +8,7 @@ export interface LeadRow {
   websiteRaw: string;
   crawlKey?: string;
   normalizedWebsite?: string;
-  preflightStatus?: "no_website" | "invalid_url" | "not_selected_limit";
+  preflightStatus?: "no_website" | "shared_host" | "invalid_url" | "not_selected_limit";
 }
 
 export interface EmailHit {

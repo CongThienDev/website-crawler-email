@@ -16,9 +16,8 @@ function collect(value: string, previous: string[]): string[] {
 
 const program = new Command()
   .name("website-email-crawler")
-  .description("Lấy email công khai từ cột Website của sheet Excel theo chiến lược HTTP-first.")
+  .description("Lấy email công khai từ website trong file lead-ledger (sheet Leads), mỗi Domain crawl một lần.")
   .requiredOption("-i, --input <file>", "File XLSX đầu vào; lặp lại option để đọc nhiều file", collect, [])
-  .option("-s, --sheet <name>", "Tên sheet chứa dữ liệu", "Data unique")
   .option("-o, --output <directory>", "Folder kết quả/checkpoint", `runs/run-${new Date().toISOString().replace(/[:.]/g, "-")}`)
   .option("--limit <number>", "Chỉ chạy N website duy nhất đầu tiên để benchmark", "0")
   .option("--concurrency <number>", "Số website chạy HTTP đồng thời", "25")
@@ -46,7 +45,6 @@ const raw = program.opts();
 
 const optionsSchema = z.object({
   input: z.array(z.string()).min(1),
-  sheet: z.string().min(1),
   output: z.string().min(1),
   limit: z.coerce.number().int().min(0),
   concurrency: z.coerce.number().int().min(1).max(200),
@@ -88,8 +86,8 @@ async function main(): Promise<void> {
   };
 
   const runStarted = new Date();
-  logger.info(`READING ${inputFiles.length} INPUT FILE(S), SHEET "${options.sheet}"`);
-  const rows = (await Promise.all(inputFiles.map((file) => loadLeadRows(file, options.sheet)))).flat();
+  logger.info(`READING ${inputFiles.length} INPUT FILE(S), SHEET "Leads"`);
+  const rows = (await Promise.all(inputFiles.map((file) => loadLeadRows(file)))).flat();
   const allTargets = new Map<string, CrawlTarget>();
   for (const row of rows) {
     if (row.crawlKey && row.normalizedWebsite && !allTargets.has(row.crawlKey)) {
@@ -174,7 +172,10 @@ async function main(): Promise<void> {
         Boolean(
           result &&
             result.browserPages === 0 &&
-            (result.status === "no_email" || ["timeout", "javascript"].includes(result.fallbackReason ?? "")),
+            (result.status === "no_email" ||
+              ["timeout", "javascript"].includes(result.fallbackReason ?? "") ||
+              // Bot walls (Cloudflare and similar) often answer plain HTTP with 403/503 but let a real browser in.
+              [403, 503].includes(result.httpStatus ?? 0)),
         ),
     );
   if (config.browserFallback && browserPending.length) {

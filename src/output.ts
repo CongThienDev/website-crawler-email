@@ -8,35 +8,14 @@ export function csvCell(value: unknown): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+// Keeps the lead-ledger columns untouched and appends the email result; crawl diagnostics stay in the checkpoint.
 export function outputRecord(row: LeadRow, result?: CrawlResult): Record<string, unknown> {
   return {
-    "Input File": row.inputFile,
-    "Input Sheet": row.inputSheet,
-    "Source Row": row.sourceRow,
     ...row.values,
-    "Normalized Website": row.normalizedWebsite ?? "",
-    "Primary Email": result?.primaryEmail ?? "",
+    Email: result?.primaryEmail ?? "",
     "All Emails": result?.emails.map((hit) => hit.email).join("; ") ?? "",
-    "Email Source URL": result?.emails[0]?.sourceUrl ?? "",
-    "Discovery Method": result?.emails[0]?.sourceType ?? "",
-    "Primary Email Score": result?.primaryEmailScore ?? result?.emails[0]?.score ?? "",
-    "Primary Email Confidence": result?.primaryEmailScore === undefined && result?.emails[0]?.score === undefined
-      ? ""
-      : Number(((result?.primaryEmailScore ?? result?.emails[0]?.score ?? 0) / 100).toFixed(2)),
-    "Crawl Status": result?.status ?? row.preflightStatus ?? "not_processed",
-    "Final URL": result?.finalUrl ?? "",
-    "HTTP Status": result?.httpStatus ?? "",
-    "Pages Crawled": result?.pagesCrawled ?? 0,
-    "HTTP Requests": result?.httpRequests ?? 0,
-    "Browser Pages": result?.browserPages ?? 0,
-    "Fallback Reason": result?.fallbackReason ?? "",
-    "Error Class": result?.errorClass ?? "",
-    "Robots ms": result?.robotsMs ?? 0,
-    "Fetch ms": result?.fetchMs ?? 0,
-    "Parse ms": result?.parseMs ?? 0,
-    "Navigation ms": result?.navigationMs ?? 0,
-    "Duration ms": result?.durationMs ?? 0,
-    Error: result?.error ?? "",
+    "Email Source": result?.emails[0]?.sourceUrl ?? "",
+    "Email Status": result?.status ?? row.preflightStatus ?? "not_processed",
   };
 }
 
@@ -55,7 +34,7 @@ export async function writeLiveXlsx(
 ): Promise<void> {
   const headers = records.length ? Object.keys(records[0]!) : [];
   const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ filename: filePath, useStyles: true });
-  const sheet = workbook.addWorksheet("Email results", { views: [{ state: "frozen", ySplit: 1 }] });
+  const sheet = workbook.addWorksheet("Leads", { views: [{ state: "frozen", ySplit: 1 }] });
   if (headers.length) {
     const header = sheet.addRow(headers);
     applyWorksheetStyle(sheet, header, headers);
@@ -93,7 +72,7 @@ export async function writeOutputs(
   const headers = records.length ? Object.keys(records[0]!) : [];
 
   const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ filename: xlsxPath, useStyles: true });
-  const sheet = workbook.addWorksheet("Email results", { views: [{ state: "frozen", ySplit: 1 }] });
+  const sheet = workbook.addWorksheet("Leads", { views: [{ state: "frozen", ySplit: 1 }] });
   if (headers.length) {
     const header = sheet.addRow(headers);
     applyWorksheetStyle(sheet, header, headers);
