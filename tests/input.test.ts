@@ -12,13 +12,16 @@ afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-async function writeLeads(rows: unknown[][], { stripCellRefs = false } = {}): Promise<string> {
+async function writeLeads(
+  rows: unknown[][],
+  { stripCellRefs = false, prefixTags = false, headers = LEAD_HEADERS } = {},
+): Promise<string> {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "email-crawler-input-"));
   temporaryDirectories.push(directory);
   const filePath = path.join(directory, "input.xlsx");
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Leads");
-  worksheet.addRow(LEAD_HEADERS);
+  worksheet.addRow(headers);
   rows.forEach((row) => worksheet.addRow(row));
   await workbook.xlsx.writeFile(filePath);
   if (stripCellRefs) {
@@ -26,6 +29,15 @@ async function writeLeads(rows: unknown[][], { stripCellRefs = false } = {}): Pr
     const zip = await JSZip.loadAsync(fs.readFileSync(filePath));
     const xml = await zip.file("xl/worksheets/sheet1.xml")!.async("string");
     zip.file("xl/worksheets/sheet1.xml", xml.replace(/<(c|row)\b([^>]*?) r="[^"]*"/g, "<$1$2"));
+    fs.writeFileSync(filePath, await zip.generateAsync({ type: "nodebuffer" }));
+  }
+  if (prefixTags) {
+    // Some older exports write <x:sheet>, <x:row>, <x:c> instead of unprefixed tags.
+    const zip = await JSZip.loadAsync(fs.readFileSync(filePath));
+    for (const name of ["xl/workbook.xml", "xl/worksheets/sheet1.xml", "xl/sharedStrings.xml"]) {
+      const xml = await zip.file(name)?.async("string");
+      if (xml) zip.file(name, xml.replace(/<(\/?)(?![?!])([a-zA-Z]+)\b/g, "<$1x:$2"));
+    }
     fs.writeFileSync(filePath, await zip.generateAsync({ type: "nodebuffer" }));
   }
   return filePath;
@@ -53,6 +65,19 @@ describe("loadLeadRows", () => {
       [undefined, "no_website"],
     ]);
     expect(rows[0]!.normalizedWebsite).toBe("https://www.acme.com/locations/austin");
+    expect(rows[0]!.values.City).toBe("Austin");
+  });
+
+  it("reads older exports without a Domain column and with prefixed tags", async () => {
+    const filePath = await writeLeads(
+      [lead("https://www.acme.com/locations/austin", "").slice(0, 13), lead("https://acme.wixsite.com/home", "").slice(0, 13)],
+      { prefixTags: true, headers: LEAD_HEADERS.slice(0, 13) },
+    );
+    const rows = await loadLeadRows(filePath);
+    expect(rows.map((row) => [row.crawlKey, row.preflightStatus])).toEqual([
+      ["acme.com/locations/austin", undefined],
+      ["acme.wixsite.com/home", undefined],
+    ]);
     expect(rows[0]!.values.City).toBe("Austin");
   });
 
