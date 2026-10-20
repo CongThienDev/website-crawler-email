@@ -1,11 +1,11 @@
 # Website Email Crawler (Node.js/TypeScript)
 
-Tool độc lập để đọc cột `Website` trong sheet `Data unique`, tìm email công khai trên website và xuất kết quả XLSX/CSV. Folder này không import hoặc thay đổi code của scraper Google Maps ở thư mục cha.
+Tool độc lập để đọc file XLSX do lead-ledger xuất (sheet `Leads`), tìm email công khai trên website và xuất kết quả XLSX/CSV. Folder này không import hoặc thay đổi code của scraper Google Maps ở thư mục cha.
 
 ## Cách hoạt động
 
-1. Đọc một hoặc nhiều file XLSX và tự tìm dòng header có cột `Website`.
-2. Chuẩn hóa URL, bỏ tracking parameters và dedupe URL giữa các file.
+1. Đọc một hoặc nhiều file XLSX của lead-ledger: sheet `Leads`, đủ 14 cột (`STT` … `center_lng`, `Domain`). File thiếu sheet hoặc thiếu cột sẽ báo lỗi.
+2. Mỗi `Domain` chỉ crawl một lần; các chi nhánh cùng domain dùng chung kết quả. Dòng có `Domain` trống (host dùng chung như facebook, wixsite) được đánh dấu `shared_host` và bỏ qua.
 3. Dùng HTTP để đọc homepage và các trang liên hệ ưu tiên như `contact`, `about`, `team`, `impressum`.
 4. Nếu HTTP không thấy email, dùng Playwright render JavaScript rồi thử lại.
 5. Ghi từng website vào `checkpoint-results.jsonl`; chạy lại cùng `--output` sẽ tiếp tục phần chưa xong.
@@ -16,7 +16,13 @@ Tool mặc định tôn trọng `robots.txt`, loại URL tracking/map/social pro
 
 ## Cài đặt
 
-Yêu cầu Node.js 20 trở lên.
+Yêu cầu Node.js 20 trở lên. Trên macOS:
+
+```bash
+brew install node@20
+echo 'export PATH="/opt/homebrew/opt/node@20/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
 
 ```bash
 cd website-email-crawler-node
@@ -28,7 +34,7 @@ Nếu chỉ benchmark HTTP thì không cần cài Chromium và thêm `--no-brows
 
 ## UI chạy trên máy/VPS
 
-UI vận hành nằm trong folder riêng này, không dùng chung UI của scraper Google Maps. UI nhận tối đa 4 file `.xlsx` có sheet `Data unique`, stream progress và log theo batch qua SSE, chỉ giữ 220 dòng mới nhất trên màn hình, cập nhật progress/KPI mỗi giây và quality metrics tối đa mỗi 5 giây, hiển thị email hit rate trên số website đã xử lý và cho tải CSV/XLSX từ checkpoint ngay cả khi job còn chạy.
+UI vận hành nằm trong folder riêng này, không dùng chung UI của scraper Google Maps. UI nhận tối đa 4 file `.xlsx` có sheet `Leads`, stream progress và log theo batch qua SSE, chỉ giữ 220 dòng mới nhất trên màn hình, cập nhật progress/KPI mỗi giây và quality metrics tối đa mỗi 5 giây, hiển thị email hit rate trên số website đã xử lý và cho tải CSV/XLSX từ checkpoint ngay cả khi job còn chạy.
 
 ```bash
 cd /path/to/GG_Map_Scraper_Email_PhoneNumber/website-email-crawler-node
@@ -55,7 +61,6 @@ Hai tool cần chạy cùng 500 website đầu tiên, cùng timeout và cùng ch
 npm run crawl -- \
   --input "/path/to/leads-part-1.xlsx" \
   --input "/path/to/leads-part-2.xlsx" \
-  --sheet "Data unique" \
   --output "runs/benchmark-500" \
   --limit 500 \
   --concurrency 25 \
@@ -87,15 +92,15 @@ Giữ nguyên `--output` khi chạy lại để resume. Không dùng chung một
 
 | Option | Mặc định | Ý nghĩa |
 | --- | ---: | --- |
-| `--limit` | `0` | `0` là toàn bộ; số khác lấy N website duy nhất đầu tiên |
+| `--limit` | `0` | `0` là toàn bộ; số khác lấy N domain đầu tiên |
 | `--concurrency` | `25` | Số website chạy HTTP đồng thời |
 | `--max-pages` | `5` | Số trang tối đa trên mỗi website |
-| `--contact-pages` | `1` | Số trang contact/about điểm cao nhất khi homepage chưa có email |
+| `--contact-pages` | `3` | Số trang contact/about điểm cao nhất khi homepage chưa có email cùng domain với website |
 | `--timeout-ms` | `15000` | Timeout cho một HTTP request |
 | `--robots-timeout-ms` | `5000` | Timeout riêng cho robots.txt |
 | `--browser-concurrency` | `4` | Số page Playwright đồng thời, tự giảm khi có 403/429 |
 | `--no-browser-fallback` | tắt | Chỉ chạy HTTP |
-| `--collect-all` | tắt | Vẫn quét tiếp sau khi đã thấy email đầu tiên |
+| `--collect-all` | tắt | Vẫn quét tiếp sau khi đã thấy email cùng domain |
 | `--no-respect-robots` | tắt | Bỏ kiểm tra robots.txt; chỉ dùng khi bạn có quyền crawl |
 | `--domain-delay-ms` | `300` | Delay tối thiểu trên cùng hostname |
 
@@ -104,12 +109,12 @@ Giữ nguyên `--output` khi chạy lại để resume. Không dùng chung một
 ## File kết quả
 
 - `checkpoint-results.jsonl`: checkpoint append-only để resume.
-- `email-results-<timestamp>.xlsx`: dữ liệu nguồn và cột email.
+- `email-results-<timestamp>.xlsx`: sheet `Leads` giữ nguyên các cột lead-ledger, thêm `Email`, `All Emails`, `Email Source`, `Email Status`. Số liệu chẩn đoán (HTTP status, thời gian…) nằm trong checkpoint.
 - `email-results-<timestamp>.csv`: cùng dữ liệu, thuận tiện import database.
 - `benchmark-summary-<timestamp>.json`: hit rate, tốc độ, request count và số browser page.
 - `events.ndjson`: từng event `start`, `done`, `metrics`, `throttle` để phân tích bằng `jq`, Python hoặc Grafana/Loki. File này được giữ đầy đủ trong folder của từng run.
 
-Các trạng thái chính: `found_http`, `found_browser`, `no_email`, `http_error`, `browser_error`, `robots_denied`, `no_website`, `invalid_url`.
+Các trạng thái chính: `found_http`, `found_browser`, `no_email`, `http_error`, `browser_error`, `robots_denied`, `no_website`, `shared_host`, `invalid_url`.
 
 ## Log realtime theo từng website
 
@@ -120,7 +125,7 @@ Tool không còn chỉ in tiến độ mỗi 50 website. Mỗi URL có hai dòng
 [INFO] DONE URL=STATTNER.COM EMAIL=contact@stattner.com SOURCE=mailto SCORE=70 STATUS=FOUND_HTTP PHASE=HTTP PROGRESS=4/500 ACTIVE=24 DURATION_MS=123 PAGES=1 HTTP_REQUESTS=1 BROWSER_PAGES=0 HTTP_STATUS=200
 ```
 
-Nếu không tìm thấy email, dòng kết quả là `NOT FOUND EMAIL`. `FALLBACK_REASON` chỉ xuất hiện khi URL thực sự đủ điều kiện chuyển sang browser. Nếu website trả 403/429, dòng đó ghi `ERROR_CLASS` và status tương ứng nhưng không fallback. Cứ mỗi 10 giây tool ghi thêm `METRICS` gồm tốc độ, active và phân bố trạng thái. Khi fallback browser cập nhật lại kết quả của một URL, progress không bị cộng lần hai.
+Nếu không tìm thấy email, dòng kết quả là `NOT FOUND EMAIL`. `FALLBACK_REASON` chỉ xuất hiện khi URL thực sự đủ điều kiện chuyển sang browser. Website trả 403/503 (thường là chặn bot kiểu Cloudflare) được thử lại bằng browser; 429 ghi `ERROR_CLASS` và không fallback. Cứ mỗi 10 giây tool ghi thêm `METRICS` gồm tốc độ, active và phân bố trạng thái. Khi fallback browser cập nhật lại kết quả của một URL, progress không bị cộng lần hai.
 
 File `crawl.log` được append đồng bộ nên vẫn xem được các website đã xử lý nếu bạn dừng bằng `Ctrl+C`; khi vượt 50 MB, file được chuyển thành `crawl.log.1`, `.2`... và giữ tối đa 5 bản cũ. Checkpoint vẫn được ghi từng kết quả vào `checkpoint-results.jsonl`. Server UI đọc checkpoint/events theo phần mới append thay vì đọc lại toàn bộ file mỗi giây, và live terminal chỉ nhận log theo batch nên không làm phình DOM hoặc SSE queue theo từng dòng.
 
@@ -134,13 +139,11 @@ npm run build
 
 Chỉ thu thập địa chỉ liên hệ được công khai trên website. Hãy tuân thủ điều khoản website, quy định bảo vệ dữ liệu và quy định chống spam áp dụng cho mục đích sử dụng của bạn.
 
+## So sánh A/B hai phiên bản
 
+```bash
+npx tsx scripts/ab-sample.ts leads.xlsx runs/ab/sample-500.xlsx 500
+npx tsx scripts/ab-compare.ts runs/ab/A runs/ab/B runs/ab/ab-diff.csv
+```
 
-
-
-
-
-
-brew install node@20
-echo 'export PATH="/opt/homebrew/opt/node@20/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+`ab-sample` lấy N domain cố định theo hash; `ab-compare` in hit rate, tốc độ và ghi các domain có email khác nhau ra CSV để xem tay.

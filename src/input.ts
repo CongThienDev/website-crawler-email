@@ -2,7 +2,26 @@ import path from "node:path";
 import sax, { type QualifiedAttribute, type QualifiedTag, type Tag } from "sax";
 import unzipper, { type File as ZipFile } from "unzipper";
 import type { LeadRow, PrimitiveCell } from "./types.js";
-import { crawlKey, normalizeWebsite } from "./url.js";
+import { normalizeWebsite } from "./url.js";
+
+// The lead-ledger export contract: sheet "Leads", the crawler's 13 columns plus "Domain".
+export const LEADS_SHEET = "Leads";
+export const LEAD_HEADERS = [
+  "STT",
+  "Name",
+  "Address",
+  "Phone Number",
+  "Website",
+  "Social",
+  "Rating",
+  "Review Count",
+  "category",
+  "City",
+  "google_maps_url",
+  "center_lat",
+  "center_lng",
+  "Domain",
+];
 
 function xmlAttribute(attributes: string, name: string): string | null {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -143,16 +162,16 @@ function makeLead(
     values,
     websiteRaw,
   };
-  if (!websiteRaw) {
-    lead.preflightStatus = "no_website";
-  } else {
-    const normalized = normalizeWebsite(websiteRaw);
-    if (!normalized) {
-      lead.preflightStatus = "invalid_url";
-    } else {
-      lead.normalizedWebsite = normalized;
-      lead.crawlKey = crawlKey(normalized);
-    }
+  // lead-ledger leaves Domain blank for hosts shared by unrelated businesses (facebook, wixsite...).
+  const domain = String(values.Domain ?? "").trim().toLowerCase();
+  const normalized = websiteRaw ? normalizeWebsite(websiteRaw) : null;
+  if (!websiteRaw) lead.preflightStatus = "no_website";
+  else if (!domain) lead.preflightStatus = "shared_host";
+  else if (!normalized) lead.preflightStatus = "invalid_url";
+  else {
+    lead.normalizedWebsite = normalized;
+    // One crawl per company domain: every branch of a chain shares its result.
+    lead.crawlKey = domain;
   }
   return lead;
 }
@@ -170,6 +189,9 @@ async function parseWorksheet(
   let currentRowNumber = 0;
   let currentCells = new Map<number, PrimitiveCell>();
   let currentCellReference = "";
+  // lead-ledger writes cells without an r="A1" reference, so fall back to position.
+  let currentColumn = 0;
+  let insideCell = false;
   let currentCellType = "";
   let currentCellRaw = "";
   let insideCellValue = false;
@@ -179,11 +201,14 @@ async function parseWorksheet(
       if (node.name === "row") {
         currentRowNumber = Number(saxAttribute(node, "r")) || currentRowNumber + 1;
         currentCells = new Map();
+        currentColumn = 0;
       } else if (node.name === "c") {
         currentCellReference = saxAttribute(node, "r");
+        currentColumn = currentCellReference ? columnNumber(currentCellReference) : currentColumn + 1;
+        insideCell = true;
         currentCellType = saxAttribute(node, "t");
         currentCellRaw = "";
-      } else if (currentCellReference && (node.name === "v" || node.name === "t")) {
+      } else if (insideCell && (node.name === "v" || node.name === "t")) {
         insideCellValue = true;
       }
     };
@@ -196,11 +221,11 @@ async function parseWorksheet(
     parser.onclosetag = (name) => {
       if (name === "v" || name === "t") insideCellValue = false;
       if (name === "c") {
-        const column = columnNumber(currentCellReference);
-        if (column) currentCells.set(column, parsedCellValue(currentCellType, currentCellRaw, sharedStrings));
+        if (currentColumn) currentCells.set(currentColumn, parsedCellValue(currentCellType, currentCellRaw, sharedStrings));
         currentCellReference = "";
         currentCellType = "";
         currentCellRaw = "";
+        insideCell = false;
       }
       if (name === "row") {
         if (!websiteColumn) {
@@ -219,11 +244,14 @@ async function parseWorksheet(
       }
     };
   });
-  if (!websiteColumn) throw new Error(`Không tìm thấy cột Website trong sheet "${sheetName}" của ${filePath}`);
+  const missing = LEAD_HEADERS.filter((header) => !headers.includes(header));
+  if (!websiteColumn || missing.length) {
+    throw new Error(`${path.basename(filePath)} không phải file lead-ledger: thiếu cột ${missing.join(", ")}`);
+  }
   return leads;
 }
 
-export async function loadLeadRows(filePath: string, sheetName: string): Promise<LeadRow[]> {
+export async function loadLeadRows(filePath: string, sheetName = LEADS_SHEET): Promise<LeadRow[]> {
   const archive = await unzipper.Open.file(filePath);
   const worksheetPath = await resolveWorksheetPath(archive, sheetName);
   if (!worksheetPath) throw new Error(`Không tìm thấy sheet "${sheetName}" trong ${filePath}`);

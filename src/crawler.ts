@@ -5,7 +5,7 @@ import { gotScraping } from "got-scraping";
 import { chromium } from "playwright";
 import { createRequire } from "node:module";
 import { DomainLimiter } from "./domainLimiter.js";
-import { extractEmails, findContactLinks, mergeEmailHits } from "./extract.js";
+import { extractEmails, findContactLinks, hasOwnDomainEmail, mergeEmailHits } from "./extract.js";
 import type { CrawlConfig, CrawlResult, CrawlTarget, EmailHit, FallbackReason } from "./types.js";
 import { originOf } from "./url.js";
 import type { CrawlPhase } from "./runLogger.js";
@@ -207,11 +207,11 @@ async function crawlOneHttp(
     allHits = extractEmails(first.body, finalUrl);
     parseMs += Date.now() - parseStarted;
     javascriptShell = allHits.length === 0 && isJavascriptShell(first.body);
-    if (config.collectAll || allHits.length === 0) {
+    if (config.collectAll || !hasOwnDomainEmail(allHits, finalUrl)) {
       const extraPages = Math.min(config.maxPages - 1, config.collectAll ? config.maxPages - 1 : config.contactPages);
       const links = findContactLinks(first.body, finalUrl).slice(0, Math.max(0, extraPages));
       for (const link of links) {
-        if (!config.collectAll && allHits.length > 0) break;
+        if (!config.collectAll && hasOwnDomainEmail(allHits, finalUrl)) break;
         if (!(await robots.allowed(link.url))) continue;
         try {
           httpRequests += 1;
@@ -282,6 +282,8 @@ export async function crawlHttpTargets(
   const crawler = new BasicCrawler({
     maxConcurrency: config.concurrency,
     minConcurrency: 1,
+    // Start at full concurrency; Crawlee otherwise ramps up from 1 and stalls at 3-4 on a laptop.
+    autoscaledPoolOptions: { desiredConcurrency: config.concurrency },
     maxRequestRetries: 0,
     requestHandlerTimeoutSecs: Math.max(30, Math.ceil((config.timeoutMs * (config.maxPages + 2)) / 1000)),
     async requestHandler({ request }) {
@@ -350,6 +352,7 @@ export async function crawlBrowserFallback(
   const crawler = new PlaywrightCrawler({
     maxConcurrency: config.browserConcurrency,
     minConcurrency: 1,
+    autoscaledPoolOptions: { desiredConcurrency: config.browserConcurrency },
     maxRequestRetries: 0,
     navigationTimeoutSecs: Math.ceil(config.browserTimeoutMs / 1000),
     requestHandlerTimeoutSecs: Math.max(45, Math.ceil((config.browserTimeoutMs * config.maxPages) / 1000)),
@@ -378,11 +381,11 @@ export async function crawlBrowserFallback(
         : 0;
       let hits = extractEmails(await page.content(), page.url());
       let browserPages = 1;
-      if (config.collectAll || hits.length === 0) {
+      if (config.collectAll || !hasOwnDomainEmail(hits, page.url())) {
         const extraPages = Math.min(config.maxPages - 1, config.collectAll ? config.maxPages - 1 : config.contactPages);
         const links = findContactLinks(await page.content(), page.url()).slice(0, Math.max(0, extraPages));
         for (const link of links) {
-          if (!config.collectAll && hits.length > 0) break;
+          if (!config.collectAll && hasOwnDomainEmail(hits, page.url())) break;
           if (!(await robots.allowed(link.url))) continue;
           try {
             await page.goto(link.url, { waitUntil: "domcontentloaded", timeout: config.browserTimeoutMs });
