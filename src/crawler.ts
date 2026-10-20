@@ -32,7 +32,7 @@ export interface CrawlObserver {
   onThrottle?: (phase: CrawlPhase, previous: number, next: number, reason: string) => void;
 }
 
-class AdaptiveConcurrency {
+export class AdaptiveConcurrency {
   private healthy = 0;
   current: number;
 
@@ -41,7 +41,9 @@ class AdaptiveConcurrency {
   }
 
   observe(status: number | null, errorClass?: CrawlResult["errorClass"]): { previous: number; next: number; reason: string } | null {
-    const blocked = status === 403 || status === 429 || errorClass === "http_403" || errorClass === "http_429";
+    // Only 429 means "slow down". A 403 is one site's bot wall; every target is a different domain, so cutting
+    // global concurrency for it starved the run (25 -> 3 within a minute on chain-heavy inputs).
+    const blocked = status === 429 || errorClass === "http_429";
     if (blocked) {
       this.healthy = 0;
       const previous = this.current;
